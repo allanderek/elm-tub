@@ -4,6 +4,7 @@
   <title>Elm Tub</title>
   <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/picnicss/6.3.2/picnic.min.css"> -->
   <script type="text/javascript" src="js/NoughtsAndCrosses.js"></script>
+  <script type="text/javascript" src="js/EditorElm.js"></script>
 </head>
 <body>
   <h1>Introduction</h1>
@@ -14,6 +15,10 @@
   The React tutorial gives a version of tic-tac-toe (which folk in the UK, including me, call noughts and crosses), so I've done roughly the same thing but in Elm. It has a move history as well as the usual rules for noughts and crosses.
   <div id="noughts-and-crosses-embed"></div>
 
+  <h1>A Text Editor in Elm</h1>
+  A simple text editor in Elm. Click in the main div to focus the editor div, and then normal text editing functions work. No selection or selection highlighting as yet. The cursor also changes width a little for a reason I'm not quite sure, but believe that it is fixable in CSS.
+  <div id="editor-elm-embed"></div>
+
 <script type="text/javascript">
   /* global Elm */
   function embed_by_id(embedder, id_name, ...flags){
@@ -21,6 +26,7 @@
     embedder.embed(embed_element, ...flags);
   }
   embed_by_id(Elm.NoughtsAndCrosses, 'noughts-and-crosses-embed');
+  embed_by_id(Elm.EditorElm, 'editor-elm-embed');
 </script>
 </body>
 </html>
