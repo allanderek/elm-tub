@@ -67,7 +67,8 @@ type alias Def =
 type Path
     = Top
     | AppPath Path (List Expr) (List Expr)
-    -- | LetDefPath Path (List Def) (List Def) Expr
+    | LetExprPath Path (List Def)
+    | LetDefPath Path (List Def) (List Def) Expr
 
 
 type Hole
@@ -118,6 +119,22 @@ moveLeft model =
                         | hole = ExprHole x
                         , path = AppPath p rest (hole :: right)
                     }
+        (LetExprPath _ _, DefHole _) -> model
+        (LetExprPath parent defs, ExprHole expr) ->
+            case List.reverse defs of
+                [] -> model
+                x :: rest ->
+                    { model
+                        | hole = DefHole x
+                        , path = LetDefPath parent rest [] expr
+                    }
+        (LetDefPath _ _ _ _, ExprHole _) -> model
+        (LetDefPath parent [] right expr, DefHole def) -> model
+        (LetDefPath parent (x::rest) right expr, DefHole def) ->
+            { model
+                | hole = DefHole x
+                , path = LetDefPath parent rest (def :: right) expr
+            }
 
 moveRight : Model -> Model
 moveRight model =
@@ -132,6 +149,19 @@ moveRight model =
                         | hole = ExprHole x
                         , path = AppPath p (hole :: left) rest
                     }
+        (LetExprPath _ _, _) -> model
+        (LetDefPath _ _ _ _, ExprHole _) -> model
+        (LetDefPath parent left [] expr, DefHole def) ->
+            { model
+                | hole = ExprHole expr
+                , path = LetExprPath parent (left ++ [def])
+            }
+        (LetDefPath parent left (x::rest) expr, DefHole def) ->
+            { model
+                | hole = DefHole x
+                , path = LetDefPath parent (left ++ [def]) rest expr
+            }
+
 
 moveUp : Model -> Model
 moveUp model =
@@ -143,6 +173,21 @@ moveUp model =
                 | hole = ExprHole <| App (left ++ [hole] ++ right)
                 , path = p
             }
+        (LetExprPath _ _, DefHole _) -> model
+        (LetExprPath parent defs, ExprHole expr) ->
+            { model
+                | hole = ExprHole <| Let defs expr
+                , path = parent
+            }
+        (LetDefPath _ _ _ _, ExprHole _) -> model
+        (LetDefPath parent left right expr, DefHole d) ->
+            let
+                newDefs = (List.reverse left) ++ [d] ++ right
+            in
+                { model
+                    | hole = ExprHole <| Let newDefs expr
+                    , path = parent
+                }
 
 
 moveDown : Model -> Model
@@ -151,7 +196,16 @@ moveDown model =
         DefHole _ -> model
         ExprHole (Var _) -> model
         ExprHole PlaceHolder -> model
-        ExprHole (Let _ _) -> model
+        ExprHole (Let [] e) -> 
+            { model
+                | hole = ExprHole e
+                , path = LetExprPath model.path []
+            }
+        ExprHole (Let (d :: rest) e) ->
+            { model
+                | hole = DefHole d
+                , path = LetDefPath model.path [] rest e
+            }
         ExprHole (App args) ->
             case args of
                 [] ->
@@ -165,7 +219,7 @@ moveDown model =
                         | hole = ExprHole x
                         , path = AppPath model.path [] rest
                     }
-
+        
 transformCurrentExpr : (Expr -> Expr) -> Model -> Model
 transformCurrentExpr newExpr model =
     case model.hole of
@@ -276,6 +330,13 @@ viewApplication : List (Html Message) -> Html Message
 viewApplication args =
     div [exprCSS, appCSS] args
 
+viewLet : List (Html Message) -> Html Message -> Html Message
+viewLet defsHtmls exprHtml =
+    let
+        defsHtml = div [] defsHtmls
+    in
+        div [exprCSS][text "let", defsHtml, text "in", exprHtml] 
+
 viewExpression : Expr -> Html Message
 viewExpression expr =
     case expr of
@@ -287,10 +348,10 @@ viewExpression expr =
             viewApplication <| List.map viewExpression args
         Let defs expr ->
             let
-                defsDiv = div [] <| List.map viewDefinition defs
+                defsDiv = List.map viewDefinition defs
                 exprDiv = viewExpression expr
             in
-                div [exprCSS][text "let", defsDiv, text "in", exprDiv] 
+                viewLet defsDiv exprDiv
 
 viewHole : Hole -> Html Message
 viewHole hole =
@@ -317,6 +378,20 @@ viewPath hole path =
                 argsHtml = leftArgs ++ [hole] ++ rightArgs
                 newHole = viewApplication argsHtml
             in
+                viewPath newHole parent
+        LetExprPath parent defs ->
+            let
+                defsHtml = List.map viewDefinition defs
+                newHole = viewLet defsHtml hole
+            in
+                viewPath newHole parent
+        LetDefPath parent left right expr ->
+            let
+                leftHtmls = List.map viewDefinition <| List.reverse left
+                rightHtmls = List.map viewDefinition right
+                defsHtmls = leftHtmls ++ [hole] ++ rightHtmls
+                newHole = viewLet defsHtmls hole
+            in  
                 viewPath newHole parent
 
 view : Model -> Html Message
