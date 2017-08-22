@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html>
+  <head><meta charset="UTF-8">
+  <title>Elm Syntax Editor</title>
+  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/picnicss/6.3.2/picnic.min.css"> -->
+  <script type="text/javascript" src="js/Elmed.js"></script>
+</head>
+<body>
+  <h1>Introduction</h1>
+  
+  A very experimental syntax editor for Elm programs.
+  
+  <div id="elmed-embed"></div>
+
+<script type="text/javascript">
+  /* global Elm */
+  function embed_by_id(embedder, id_name, ...flags){
+    var embed_element = document.getElementById(id_name);
+    embedder.embed(embed_element, ...flags);
+  }
+  embed_by_id(Elm.Elmed, 'elmed-embed');
+</script>
+</body>
+</html>
