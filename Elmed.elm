@@ -326,5 +326,11 @@ view model =
             Events.on "keydown" (Json.map HandleKeyboardEvent decodeKeyboardEvent)
         focusedDiv = div [focusedCSS] [viewHole model.hole]    
         contentDivs = [viewPath focusedDiv model.path]
+        editorAttributes =
+            [ editorStyle
+            , keygrabberAttribute
+            , Attributes.tabindex 0
+            , Attributes.id "editor-main"
+            ]
     in
-        div [ editorStyle, keygrabberAttribute, Attributes.tabindex 0 ] contentDivs
+        div editorAttributes contentDivs

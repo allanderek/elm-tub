@@ -17,6 +17,7 @@
   function embed_by_id(embedder, id_name, ...flags){
     var embed_element = document.getElementById(id_name);
     embedder.embed(embed_element, ...flags);
+    return embed_element;
   }
   embed_by_id(Elm.Elmed, 'elmed-embed');
 </script>
