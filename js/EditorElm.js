@@ -4855,6 +4855,189 @@ var _elm_lang$core$Json_Decode$bool = _elm_lang$core$Native_Json.decodePrimitive
 var _elm_lang$core$Json_Decode$string = _elm_lang$core$Native_Json.decodePrimitive('string');
 var _elm_lang$core$Json_Decode$Decoder = {ctor: 'Decoder'};
 
+var _elm_lang$dom$Native_Dom = function() {
+
+var fakeNode = {
+	addEventListener: function() {},
+	removeEventListener: function() {}
+};
+
+var onDocument = on(typeof document !== 'undefined' ? document : fakeNode);
+var onWindow = on(typeof window !== 'undefined' ? window : fakeNode);
+
+function on(node)
+{
+	return function(eventName, decoder, toTask)
+	{
+		return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback) {
+
+			function performTask(event)
+			{
+				var result = A2(_elm_lang$core$Json_Decode$decodeValue, decoder, event);
+				if (result.ctor === 'Ok')
+				{
+					_elm_lang$core$Native_Scheduler.rawSpawn(toTask(result._0));
+				}
+			}
+
+			node.addEventListener(eventName, performTask);
+
+			return function()
+			{
+				node.removeEventListener(eventName, performTask);
+			};
+		});
+	};
+}
+
+var rAF = typeof requestAnimationFrame !== 'undefined'
+	? requestAnimationFrame
+	: function(callback) { callback(); };
+
+function withNode(id, doStuff)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		rAF(function()
+		{
+			var node = document.getElementById(id);
+			if (node === null)
+			{
+				callback(_elm_lang$core$Native_Scheduler.fail({ ctor: 'NotFound', _0: id }));
+				return;
+			}
+			callback(_elm_lang$core$Native_Scheduler.succeed(doStuff(node)));
+		});
+	});
+}
+
+
+// FOCUS
+
+function focus(id)
+{
+	return withNode(id, function(node) {
+		node.focus();
+		return _elm_lang$core$Native_Utils.Tuple0;
+	});
+}
+
+function blur(id)
+{
+	return withNode(id, function(node) {
+		node.blur();
+		return _elm_lang$core$Native_Utils.Tuple0;
+	});
+}
+
+
+// SCROLLING
+
+function getScrollTop(id)
+{
+	return withNode(id, function(node) {
+		return node.scrollTop;
+	});
+}
+
+function setScrollTop(id, desiredScrollTop)
+{
+	return withNode(id, function(node) {
+		node.scrollTop = desiredScrollTop;
+		return _elm_lang$core$Native_Utils.Tuple0;
+	});
+}
+
+function toBottom(id)
+{
+	return withNode(id, function(node) {
+		node.scrollTop = node.scrollHeight;
+		return _elm_lang$core$Native_Utils.Tuple0;
+	});
+}
+
+function getScrollLeft(id)
+{
+	return withNode(id, function(node) {
+		return node.scrollLeft;
+	});
+}
+
+function setScrollLeft(id, desiredScrollLeft)
+{
+	return withNode(id, function(node) {
+		node.scrollLeft = desiredScrollLeft;
+		return _elm_lang$core$Native_Utils.Tuple0;
+	});
+}
+
+function toRight(id)
+{
+	return withNode(id, function(node) {
+		node.scrollLeft = node.scrollWidth;
+		return _elm_lang$core$Native_Utils.Tuple0;
+	});
+}
+
+
+// SIZE
+
+function width(options, id)
+{
+	return withNode(id, function(node) {
+		switch (options.ctor)
+		{
+			case 'Content':
+				return node.scrollWidth;
+			case 'VisibleContent':
+				return node.clientWidth;
+			case 'VisibleContentWithBorders':
+				return node.offsetWidth;
+			case 'VisibleContentWithBordersAndMargins':
+				var rect = node.getBoundingClientRect();
+				return rect.right - rect.left;
+		}
+	});
+}
+
+function height(options, id)
+{
+	return withNode(id, function(node) {
+		switch (options.ctor)
+		{
+			case 'Content':
+				return node.scrollHeight;
+			case 'VisibleContent':
+				return node.clientHeight;
+			case 'VisibleContentWithBorders':
+				return node.offsetHeight;
+			case 'VisibleContentWithBordersAndMargins':
+				var rect = node.getBoundingClientRect();
+				return rect.bottom - rect.top;
+		}
+	});
+}
+
+return {
+	onDocument: F3(onDocument),
+	onWindow: F3(onWindow),
+
+	focus: focus,
+	blur: blur,
+
+	getScrollTop: getScrollTop,
+	setScrollTop: F2(setScrollTop),
+	getScrollLeft: getScrollLeft,
+	setScrollLeft: F2(setScrollLeft),
+	toBottom: toBottom,
+	toRight: toRight,
+
+	height: F2(height),
+	width: F2(width)
+};
+
+}();
+
 //import Native.Utils //
 
 var _elm_lang$core$Native_Scheduler = function() {
@@ -5727,6 +5910,203 @@ var _elm_lang$core$Platform$Task = {ctor: 'Task'};
 var _elm_lang$core$Platform$ProcessId = {ctor: 'ProcessId'};
 var _elm_lang$core$Platform$Router = {ctor: 'Router'};
 
+var _elm_lang$core$Task$onError = _elm_lang$core$Native_Scheduler.onError;
+var _elm_lang$core$Task$andThen = _elm_lang$core$Native_Scheduler.andThen;
+var _elm_lang$core$Task$spawnCmd = F2(
+	function (router, _p0) {
+		var _p1 = _p0;
+		return _elm_lang$core$Native_Scheduler.spawn(
+			A2(
+				_elm_lang$core$Task$andThen,
+				_elm_lang$core$Platform$sendToApp(router),
+				_p1._0));
+	});
+var _elm_lang$core$Task$fail = _elm_lang$core$Native_Scheduler.fail;
+var _elm_lang$core$Task$mapError = F2(
+	function (convert, task) {
+		return A2(
+			_elm_lang$core$Task$onError,
+			function (_p2) {
+				return _elm_lang$core$Task$fail(
+					convert(_p2));
+			},
+			task);
+	});
+var _elm_lang$core$Task$succeed = _elm_lang$core$Native_Scheduler.succeed;
+var _elm_lang$core$Task$map = F2(
+	function (func, taskA) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (a) {
+				return _elm_lang$core$Task$succeed(
+					func(a));
+			},
+			taskA);
+	});
+var _elm_lang$core$Task$map2 = F3(
+	function (func, taskA, taskB) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (a) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					function (b) {
+						return _elm_lang$core$Task$succeed(
+							A2(func, a, b));
+					},
+					taskB);
+			},
+			taskA);
+	});
+var _elm_lang$core$Task$map3 = F4(
+	function (func, taskA, taskB, taskC) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (a) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					function (b) {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							function (c) {
+								return _elm_lang$core$Task$succeed(
+									A3(func, a, b, c));
+							},
+							taskC);
+					},
+					taskB);
+			},
+			taskA);
+	});
+var _elm_lang$core$Task$map4 = F5(
+	function (func, taskA, taskB, taskC, taskD) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (a) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					function (b) {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							function (c) {
+								return A2(
+									_elm_lang$core$Task$andThen,
+									function (d) {
+										return _elm_lang$core$Task$succeed(
+											A4(func, a, b, c, d));
+									},
+									taskD);
+							},
+							taskC);
+					},
+					taskB);
+			},
+			taskA);
+	});
+var _elm_lang$core$Task$map5 = F6(
+	function (func, taskA, taskB, taskC, taskD, taskE) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (a) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					function (b) {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							function (c) {
+								return A2(
+									_elm_lang$core$Task$andThen,
+									function (d) {
+										return A2(
+											_elm_lang$core$Task$andThen,
+											function (e) {
+												return _elm_lang$core$Task$succeed(
+													A5(func, a, b, c, d, e));
+											},
+											taskE);
+									},
+									taskD);
+							},
+							taskC);
+					},
+					taskB);
+			},
+			taskA);
+	});
+var _elm_lang$core$Task$sequence = function (tasks) {
+	var _p3 = tasks;
+	if (_p3.ctor === '[]') {
+		return _elm_lang$core$Task$succeed(
+			{ctor: '[]'});
+	} else {
+		return A3(
+			_elm_lang$core$Task$map2,
+			F2(
+				function (x, y) {
+					return {ctor: '::', _0: x, _1: y};
+				}),
+			_p3._0,
+			_elm_lang$core$Task$sequence(_p3._1));
+	}
+};
+var _elm_lang$core$Task$onEffects = F3(
+	function (router, commands, state) {
+		return A2(
+			_elm_lang$core$Task$map,
+			function (_p4) {
+				return {ctor: '_Tuple0'};
+			},
+			_elm_lang$core$Task$sequence(
+				A2(
+					_elm_lang$core$List$map,
+					_elm_lang$core$Task$spawnCmd(router),
+					commands)));
+	});
+var _elm_lang$core$Task$init = _elm_lang$core$Task$succeed(
+	{ctor: '_Tuple0'});
+var _elm_lang$core$Task$onSelfMsg = F3(
+	function (_p7, _p6, _p5) {
+		return _elm_lang$core$Task$succeed(
+			{ctor: '_Tuple0'});
+	});
+var _elm_lang$core$Task$command = _elm_lang$core$Native_Platform.leaf('Task');
+var _elm_lang$core$Task$Perform = function (a) {
+	return {ctor: 'Perform', _0: a};
+};
+var _elm_lang$core$Task$perform = F2(
+	function (toMessage, task) {
+		return _elm_lang$core$Task$command(
+			_elm_lang$core$Task$Perform(
+				A2(_elm_lang$core$Task$map, toMessage, task)));
+	});
+var _elm_lang$core$Task$attempt = F2(
+	function (resultToMessage, task) {
+		return _elm_lang$core$Task$command(
+			_elm_lang$core$Task$Perform(
+				A2(
+					_elm_lang$core$Task$onError,
+					function (_p8) {
+						return _elm_lang$core$Task$succeed(
+							resultToMessage(
+								_elm_lang$core$Result$Err(_p8)));
+					},
+					A2(
+						_elm_lang$core$Task$andThen,
+						function (_p9) {
+							return _elm_lang$core$Task$succeed(
+								resultToMessage(
+									_elm_lang$core$Result$Ok(_p9)));
+						},
+						task))));
+	});
+var _elm_lang$core$Task$cmdMap = F2(
+	function (tagger, _p10) {
+		var _p11 = _p10;
+		return _elm_lang$core$Task$Perform(
+			A2(_elm_lang$core$Task$map, tagger, _p11._0));
+	});
+_elm_lang$core$Native_Platform.effectManagers['Task'] = {pkg: 'elm-lang/core', init: _elm_lang$core$Task$init, onEffects: _elm_lang$core$Task$onEffects, onSelfMsg: _elm_lang$core$Task$onSelfMsg, tag: 'cmd', cmdMap: _elm_lang$core$Task$cmdMap};
+
 var _elm_lang$core$Debug$crash = _elm_lang$core$Native_Debug.crash;
 var _elm_lang$core$Debug$log = _elm_lang$core$Native_Debug.log;
 
@@ -5755,6 +6135,1117 @@ var _elm_lang$core$Tuple$second = function (_p4) {
 var _elm_lang$core$Tuple$first = function (_p6) {
 	var _p7 = _p6;
 	return _p7._0;
+};
+
+var _elm_lang$dom$Dom_LowLevel$onWindow = _elm_lang$dom$Native_Dom.onWindow;
+var _elm_lang$dom$Dom_LowLevel$onDocument = _elm_lang$dom$Native_Dom.onDocument;
+
+//import Native.Scheduler //
+
+var _elm_lang$core$Native_Time = function() {
+
+var now = _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+{
+	callback(_elm_lang$core$Native_Scheduler.succeed(Date.now()));
+});
+
+function setInterval_(interval, task)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		var id = setInterval(function() {
+			_elm_lang$core$Native_Scheduler.rawSpawn(task);
+		}, interval);
+
+		return function() { clearInterval(id); };
+	});
+}
+
+return {
+	now: now,
+	setInterval_: F2(setInterval_)
+};
+
+}();
+var _elm_lang$core$Time$setInterval = _elm_lang$core$Native_Time.setInterval_;
+var _elm_lang$core$Time$spawnHelp = F3(
+	function (router, intervals, processes) {
+		var _p0 = intervals;
+		if (_p0.ctor === '[]') {
+			return _elm_lang$core$Task$succeed(processes);
+		} else {
+			var _p1 = _p0._0;
+			var spawnRest = function (id) {
+				return A3(
+					_elm_lang$core$Time$spawnHelp,
+					router,
+					_p0._1,
+					A3(_elm_lang$core$Dict$insert, _p1, id, processes));
+			};
+			var spawnTimer = _elm_lang$core$Native_Scheduler.spawn(
+				A2(
+					_elm_lang$core$Time$setInterval,
+					_p1,
+					A2(_elm_lang$core$Platform$sendToSelf, router, _p1)));
+			return A2(_elm_lang$core$Task$andThen, spawnRest, spawnTimer);
+		}
+	});
+var _elm_lang$core$Time$addMySub = F2(
+	function (_p2, state) {
+		var _p3 = _p2;
+		var _p6 = _p3._1;
+		var _p5 = _p3._0;
+		var _p4 = A2(_elm_lang$core$Dict$get, _p5, state);
+		if (_p4.ctor === 'Nothing') {
+			return A3(
+				_elm_lang$core$Dict$insert,
+				_p5,
+				{
+					ctor: '::',
+					_0: _p6,
+					_1: {ctor: '[]'}
+				},
+				state);
+		} else {
+			return A3(
+				_elm_lang$core$Dict$insert,
+				_p5,
+				{ctor: '::', _0: _p6, _1: _p4._0},
+				state);
+		}
+	});
+var _elm_lang$core$Time$inMilliseconds = function (t) {
+	return t;
+};
+var _elm_lang$core$Time$millisecond = 1;
+var _elm_lang$core$Time$second = 1000 * _elm_lang$core$Time$millisecond;
+var _elm_lang$core$Time$minute = 60 * _elm_lang$core$Time$second;
+var _elm_lang$core$Time$hour = 60 * _elm_lang$core$Time$minute;
+var _elm_lang$core$Time$inHours = function (t) {
+	return t / _elm_lang$core$Time$hour;
+};
+var _elm_lang$core$Time$inMinutes = function (t) {
+	return t / _elm_lang$core$Time$minute;
+};
+var _elm_lang$core$Time$inSeconds = function (t) {
+	return t / _elm_lang$core$Time$second;
+};
+var _elm_lang$core$Time$now = _elm_lang$core$Native_Time.now;
+var _elm_lang$core$Time$onSelfMsg = F3(
+	function (router, interval, state) {
+		var _p7 = A2(_elm_lang$core$Dict$get, interval, state.taggers);
+		if (_p7.ctor === 'Nothing') {
+			return _elm_lang$core$Task$succeed(state);
+		} else {
+			var tellTaggers = function (time) {
+				return _elm_lang$core$Task$sequence(
+					A2(
+						_elm_lang$core$List$map,
+						function (tagger) {
+							return A2(
+								_elm_lang$core$Platform$sendToApp,
+								router,
+								tagger(time));
+						},
+						_p7._0));
+			};
+			return A2(
+				_elm_lang$core$Task$andThen,
+				function (_p8) {
+					return _elm_lang$core$Task$succeed(state);
+				},
+				A2(_elm_lang$core$Task$andThen, tellTaggers, _elm_lang$core$Time$now));
+		}
+	});
+var _elm_lang$core$Time$subscription = _elm_lang$core$Native_Platform.leaf('Time');
+var _elm_lang$core$Time$State = F2(
+	function (a, b) {
+		return {taggers: a, processes: b};
+	});
+var _elm_lang$core$Time$init = _elm_lang$core$Task$succeed(
+	A2(_elm_lang$core$Time$State, _elm_lang$core$Dict$empty, _elm_lang$core$Dict$empty));
+var _elm_lang$core$Time$onEffects = F3(
+	function (router, subs, _p9) {
+		var _p10 = _p9;
+		var rightStep = F3(
+			function (_p12, id, _p11) {
+				var _p13 = _p11;
+				return {
+					ctor: '_Tuple3',
+					_0: _p13._0,
+					_1: _p13._1,
+					_2: A2(
+						_elm_lang$core$Task$andThen,
+						function (_p14) {
+							return _p13._2;
+						},
+						_elm_lang$core$Native_Scheduler.kill(id))
+				};
+			});
+		var bothStep = F4(
+			function (interval, taggers, id, _p15) {
+				var _p16 = _p15;
+				return {
+					ctor: '_Tuple3',
+					_0: _p16._0,
+					_1: A3(_elm_lang$core$Dict$insert, interval, id, _p16._1),
+					_2: _p16._2
+				};
+			});
+		var leftStep = F3(
+			function (interval, taggers, _p17) {
+				var _p18 = _p17;
+				return {
+					ctor: '_Tuple3',
+					_0: {ctor: '::', _0: interval, _1: _p18._0},
+					_1: _p18._1,
+					_2: _p18._2
+				};
+			});
+		var newTaggers = A3(_elm_lang$core$List$foldl, _elm_lang$core$Time$addMySub, _elm_lang$core$Dict$empty, subs);
+		var _p19 = A6(
+			_elm_lang$core$Dict$merge,
+			leftStep,
+			bothStep,
+			rightStep,
+			newTaggers,
+			_p10.processes,
+			{
+				ctor: '_Tuple3',
+				_0: {ctor: '[]'},
+				_1: _elm_lang$core$Dict$empty,
+				_2: _elm_lang$core$Task$succeed(
+					{ctor: '_Tuple0'})
+			});
+		var spawnList = _p19._0;
+		var existingDict = _p19._1;
+		var killTask = _p19._2;
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (newProcesses) {
+				return _elm_lang$core$Task$succeed(
+					A2(_elm_lang$core$Time$State, newTaggers, newProcesses));
+			},
+			A2(
+				_elm_lang$core$Task$andThen,
+				function (_p20) {
+					return A3(_elm_lang$core$Time$spawnHelp, router, spawnList, existingDict);
+				},
+				killTask));
+	});
+var _elm_lang$core$Time$Every = F2(
+	function (a, b) {
+		return {ctor: 'Every', _0: a, _1: b};
+	});
+var _elm_lang$core$Time$every = F2(
+	function (interval, tagger) {
+		return _elm_lang$core$Time$subscription(
+			A2(_elm_lang$core$Time$Every, interval, tagger));
+	});
+var _elm_lang$core$Time$subMap = F2(
+	function (f, _p21) {
+		var _p22 = _p21;
+		return A2(
+			_elm_lang$core$Time$Every,
+			_p22._0,
+			function (_p23) {
+				return f(
+					_p22._1(_p23));
+			});
+	});
+_elm_lang$core$Native_Platform.effectManagers['Time'] = {pkg: 'elm-lang/core', init: _elm_lang$core$Time$init, onEffects: _elm_lang$core$Time$onEffects, onSelfMsg: _elm_lang$core$Time$onSelfMsg, tag: 'sub', subMap: _elm_lang$core$Time$subMap};
+
+var _elm_lang$core$Process$kill = _elm_lang$core$Native_Scheduler.kill;
+var _elm_lang$core$Process$sleep = _elm_lang$core$Native_Scheduler.sleep;
+var _elm_lang$core$Process$spawn = _elm_lang$core$Native_Scheduler.spawn;
+
+var _elm_lang$keyboard$Keyboard$onSelfMsg = F3(
+	function (router, _p0, state) {
+		var _p1 = _p0;
+		var _p2 = A2(_elm_lang$core$Dict$get, _p1.category, state);
+		if (_p2.ctor === 'Nothing') {
+			return _elm_lang$core$Task$succeed(state);
+		} else {
+			var send = function (tagger) {
+				return A2(
+					_elm_lang$core$Platform$sendToApp,
+					router,
+					tagger(_p1.keyCode));
+			};
+			return A2(
+				_elm_lang$core$Task$andThen,
+				function (_p3) {
+					return _elm_lang$core$Task$succeed(state);
+				},
+				_elm_lang$core$Task$sequence(
+					A2(_elm_lang$core$List$map, send, _p2._0.taggers)));
+		}
+	});
+var _elm_lang$keyboard$Keyboard_ops = _elm_lang$keyboard$Keyboard_ops || {};
+_elm_lang$keyboard$Keyboard_ops['&>'] = F2(
+	function (task1, task2) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			function (_p4) {
+				return task2;
+			},
+			task1);
+	});
+var _elm_lang$keyboard$Keyboard$init = _elm_lang$core$Task$succeed(_elm_lang$core$Dict$empty);
+var _elm_lang$keyboard$Keyboard$categorizeHelpHelp = F2(
+	function (value, maybeValues) {
+		var _p5 = maybeValues;
+		if (_p5.ctor === 'Nothing') {
+			return _elm_lang$core$Maybe$Just(
+				{
+					ctor: '::',
+					_0: value,
+					_1: {ctor: '[]'}
+				});
+		} else {
+			return _elm_lang$core$Maybe$Just(
+				{ctor: '::', _0: value, _1: _p5._0});
+		}
+	});
+var _elm_lang$keyboard$Keyboard$categorizeHelp = F2(
+	function (subs, subDict) {
+		categorizeHelp:
+		while (true) {
+			var _p6 = subs;
+			if (_p6.ctor === '[]') {
+				return subDict;
+			} else {
+				var _v4 = _p6._1,
+					_v5 = A3(
+					_elm_lang$core$Dict$update,
+					_p6._0._0,
+					_elm_lang$keyboard$Keyboard$categorizeHelpHelp(_p6._0._1),
+					subDict);
+				subs = _v4;
+				subDict = _v5;
+				continue categorizeHelp;
+			}
+		}
+	});
+var _elm_lang$keyboard$Keyboard$categorize = function (subs) {
+	return A2(_elm_lang$keyboard$Keyboard$categorizeHelp, subs, _elm_lang$core$Dict$empty);
+};
+var _elm_lang$keyboard$Keyboard$keyCode = A2(_elm_lang$core$Json_Decode$field, 'keyCode', _elm_lang$core$Json_Decode$int);
+var _elm_lang$keyboard$Keyboard$subscription = _elm_lang$core$Native_Platform.leaf('Keyboard');
+var _elm_lang$keyboard$Keyboard$Watcher = F2(
+	function (a, b) {
+		return {taggers: a, pid: b};
+	});
+var _elm_lang$keyboard$Keyboard$Msg = F2(
+	function (a, b) {
+		return {category: a, keyCode: b};
+	});
+var _elm_lang$keyboard$Keyboard$onEffects = F3(
+	function (router, newSubs, oldState) {
+		var rightStep = F3(
+			function (category, taggers, task) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					function (state) {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							function (pid) {
+								return _elm_lang$core$Task$succeed(
+									A3(
+										_elm_lang$core$Dict$insert,
+										category,
+										A2(_elm_lang$keyboard$Keyboard$Watcher, taggers, pid),
+										state));
+							},
+							_elm_lang$core$Process$spawn(
+								A3(
+									_elm_lang$dom$Dom_LowLevel$onDocument,
+									category,
+									_elm_lang$keyboard$Keyboard$keyCode,
+									function (_p7) {
+										return A2(
+											_elm_lang$core$Platform$sendToSelf,
+											router,
+											A2(_elm_lang$keyboard$Keyboard$Msg, category, _p7));
+									})));
+					},
+					task);
+			});
+		var bothStep = F4(
+			function (category, _p8, taggers, task) {
+				var _p9 = _p8;
+				return A2(
+					_elm_lang$core$Task$map,
+					A2(
+						_elm_lang$core$Dict$insert,
+						category,
+						A2(_elm_lang$keyboard$Keyboard$Watcher, taggers, _p9.pid)),
+					task);
+			});
+		var leftStep = F3(
+			function (category, _p10, task) {
+				var _p11 = _p10;
+				return A2(
+					_elm_lang$keyboard$Keyboard_ops['&>'],
+					_elm_lang$core$Process$kill(_p11.pid),
+					task);
+			});
+		return A6(
+			_elm_lang$core$Dict$merge,
+			leftStep,
+			bothStep,
+			rightStep,
+			oldState,
+			_elm_lang$keyboard$Keyboard$categorize(newSubs),
+			_elm_lang$core$Task$succeed(_elm_lang$core$Dict$empty));
+	});
+var _elm_lang$keyboard$Keyboard$MySub = F2(
+	function (a, b) {
+		return {ctor: 'MySub', _0: a, _1: b};
+	});
+var _elm_lang$keyboard$Keyboard$presses = function (tagger) {
+	return _elm_lang$keyboard$Keyboard$subscription(
+		A2(_elm_lang$keyboard$Keyboard$MySub, 'keypress', tagger));
+};
+var _elm_lang$keyboard$Keyboard$downs = function (tagger) {
+	return _elm_lang$keyboard$Keyboard$subscription(
+		A2(_elm_lang$keyboard$Keyboard$MySub, 'keydown', tagger));
+};
+var _elm_lang$keyboard$Keyboard$ups = function (tagger) {
+	return _elm_lang$keyboard$Keyboard$subscription(
+		A2(_elm_lang$keyboard$Keyboard$MySub, 'keyup', tagger));
+};
+var _elm_lang$keyboard$Keyboard$subMap = F2(
+	function (func, _p12) {
+		var _p13 = _p12;
+		return A2(
+			_elm_lang$keyboard$Keyboard$MySub,
+			_p13._0,
+			function (_p14) {
+				return func(
+					_p13._1(_p14));
+			});
+	});
+_elm_lang$core$Native_Platform.effectManagers['Keyboard'] = {pkg: 'elm-lang/keyboard', init: _elm_lang$keyboard$Keyboard$init, onEffects: _elm_lang$keyboard$Keyboard$onEffects, onSelfMsg: _elm_lang$keyboard$Keyboard$onSelfMsg, tag: 'sub', subMap: _elm_lang$keyboard$Keyboard$subMap};
+
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$toChar = function (key) {
+	var _p0 = key;
+	switch (_p0.ctor) {
+		case 'Spacebar':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr(' '));
+		case 'Zero':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('0'));
+		case 'One':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('1'));
+		case 'Two':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('2'));
+		case 'Three':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('3'));
+		case 'Four':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('4'));
+		case 'Five':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('5'));
+		case 'Six':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('6'));
+		case 'Seven':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('7'));
+		case 'Eight':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('8'));
+		case 'Nine':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('9'));
+		case 'A':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('A'));
+		case 'B':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('B'));
+		case 'C':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('C'));
+		case 'D':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('D'));
+		case 'E':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('E'));
+		case 'F':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('F'));
+		case 'G':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('G'));
+		case 'H':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('H'));
+		case 'I':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('I'));
+		case 'J':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('J'));
+		case 'K':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('K'));
+		case 'L':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('L'));
+		case 'M':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('M'));
+		case 'N':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('N'));
+		case 'O':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('O'));
+		case 'P':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('P'));
+		case 'Q':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('Q'));
+		case 'R':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('R'));
+		case 'S':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('S'));
+		case 'T':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('T'));
+		case 'U':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('U'));
+		case 'V':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('V'));
+		case 'W':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('W'));
+		case 'X':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('X'));
+		case 'Y':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('Y'));
+		case 'Z':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('Z'));
+		case 'NumpadZero':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('0'));
+		case 'NumpadOne':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('1'));
+		case 'NumpadTwo':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('2'));
+		case 'NumpadThree':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('3'));
+		case 'NumpadFour':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('4'));
+		case 'NumpadFive':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('5'));
+		case 'NumpadSix':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('6'));
+		case 'NumpadSeven':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('7'));
+		case 'NumpadEight':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('8'));
+		case 'NumpadNine':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('9'));
+		case 'Multiply':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('*'));
+		case 'Add':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('+'));
+		case 'Subtract':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('-'));
+		case 'Divide':
+			return _elm_lang$core$Maybe$Just(
+				_elm_lang$core$Native_Utils.chr('/'));
+		default:
+			return _elm_lang$core$Maybe$Nothing;
+	}
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Unknown = function (a) {
+	return {ctor: 'Unknown', _0: a};
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Ambiguous = function (a) {
+	return {ctor: 'Ambiguous', _0: a};
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Divide = {ctor: 'Divide'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Decimal = {ctor: 'Decimal'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Subtract = {ctor: 'Subtract'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Add = {ctor: 'Add'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Multiply = {ctor: 'Multiply'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadNine = {ctor: 'NumpadNine'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadEight = {ctor: 'NumpadEight'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadSeven = {ctor: 'NumpadSeven'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadSix = {ctor: 'NumpadSix'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadFive = {ctor: 'NumpadFive'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadFour = {ctor: 'NumpadFour'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadThree = {ctor: 'NumpadThree'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadTwo = {ctor: 'NumpadTwo'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadOne = {ctor: 'NumpadOne'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadZero = {ctor: 'NumpadZero'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F12 = {ctor: 'F12'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F11 = {ctor: 'F11'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F10 = {ctor: 'F10'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F9 = {ctor: 'F9'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F8 = {ctor: 'F8'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F7 = {ctor: 'F7'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F6 = {ctor: 'F6'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F5 = {ctor: 'F5'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F4 = {ctor: 'F4'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F3 = {ctor: 'F3'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F2 = {ctor: 'F2'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F1 = {ctor: 'F1'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$ScrollLock = {ctor: 'ScrollLock'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumLock = {ctor: 'NumLock'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$ChromeSearch = {ctor: 'ChromeSearch'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Command = {ctor: 'Command'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Windows = {ctor: 'Windows'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$code = function (key) {
+	var _p1 = key;
+	switch (_p1.ctor) {
+		case 'Backspace':
+			return _elm_lang$core$Maybe$Just(8);
+		case 'Tab':
+			return _elm_lang$core$Maybe$Just(9);
+		case 'Enter':
+			return _elm_lang$core$Maybe$Just(13);
+		case 'Shift':
+			return _elm_lang$core$Maybe$Just(16);
+		case 'Ctrl':
+			return _elm_lang$core$Maybe$Just(17);
+		case 'Alt':
+			return _elm_lang$core$Maybe$Just(18);
+		case 'PauseBreak':
+			return _elm_lang$core$Maybe$Just(19);
+		case 'CapsLock':
+			return _elm_lang$core$Maybe$Just(20);
+		case 'Escape':
+			return _elm_lang$core$Maybe$Just(27);
+		case 'Spacebar':
+			return _elm_lang$core$Maybe$Just(32);
+		case 'PageUp':
+			return _elm_lang$core$Maybe$Just(33);
+		case 'PageDown':
+			return _elm_lang$core$Maybe$Just(34);
+		case 'End':
+			return _elm_lang$core$Maybe$Just(35);
+		case 'Home':
+			return _elm_lang$core$Maybe$Just(36);
+		case 'Left':
+			return _elm_lang$core$Maybe$Just(37);
+		case 'Up':
+			return _elm_lang$core$Maybe$Just(38);
+		case 'Right':
+			return _elm_lang$core$Maybe$Just(39);
+		case 'Down':
+			return _elm_lang$core$Maybe$Just(40);
+		case 'PrintScreen':
+			return _elm_lang$core$Maybe$Just(44);
+		case 'Insert':
+			return _elm_lang$core$Maybe$Just(45);
+		case 'Delete':
+			return _elm_lang$core$Maybe$Just(46);
+		case 'Zero':
+			return _elm_lang$core$Maybe$Just(48);
+		case 'One':
+			return _elm_lang$core$Maybe$Just(49);
+		case 'Two':
+			return _elm_lang$core$Maybe$Just(50);
+		case 'Three':
+			return _elm_lang$core$Maybe$Just(51);
+		case 'Four':
+			return _elm_lang$core$Maybe$Just(52);
+		case 'Five':
+			return _elm_lang$core$Maybe$Just(53);
+		case 'Six':
+			return _elm_lang$core$Maybe$Just(54);
+		case 'Seven':
+			return _elm_lang$core$Maybe$Just(55);
+		case 'Eight':
+			return _elm_lang$core$Maybe$Just(56);
+		case 'Nine':
+			return _elm_lang$core$Maybe$Just(57);
+		case 'A':
+			return _elm_lang$core$Maybe$Just(65);
+		case 'B':
+			return _elm_lang$core$Maybe$Just(66);
+		case 'C':
+			return _elm_lang$core$Maybe$Just(67);
+		case 'D':
+			return _elm_lang$core$Maybe$Just(68);
+		case 'E':
+			return _elm_lang$core$Maybe$Just(69);
+		case 'F':
+			return _elm_lang$core$Maybe$Just(70);
+		case 'G':
+			return _elm_lang$core$Maybe$Just(71);
+		case 'H':
+			return _elm_lang$core$Maybe$Just(72);
+		case 'I':
+			return _elm_lang$core$Maybe$Just(73);
+		case 'J':
+			return _elm_lang$core$Maybe$Just(74);
+		case 'K':
+			return _elm_lang$core$Maybe$Just(75);
+		case 'L':
+			return _elm_lang$core$Maybe$Just(76);
+		case 'M':
+			return _elm_lang$core$Maybe$Just(77);
+		case 'N':
+			return _elm_lang$core$Maybe$Just(78);
+		case 'O':
+			return _elm_lang$core$Maybe$Just(79);
+		case 'P':
+			return _elm_lang$core$Maybe$Just(80);
+		case 'Q':
+			return _elm_lang$core$Maybe$Just(81);
+		case 'R':
+			return _elm_lang$core$Maybe$Just(82);
+		case 'S':
+			return _elm_lang$core$Maybe$Just(83);
+		case 'T':
+			return _elm_lang$core$Maybe$Just(84);
+		case 'U':
+			return _elm_lang$core$Maybe$Just(85);
+		case 'V':
+			return _elm_lang$core$Maybe$Just(86);
+		case 'W':
+			return _elm_lang$core$Maybe$Just(87);
+		case 'X':
+			return _elm_lang$core$Maybe$Just(88);
+		case 'Y':
+			return _elm_lang$core$Maybe$Just(89);
+		case 'Z':
+			return _elm_lang$core$Maybe$Just(90);
+		case 'Ambiguous':
+			return A2(
+				_elm_lang$core$List$all,
+				A2(
+					_elm_lang$core$Basics$flip,
+					_elm_lang$core$List$member,
+					{
+						ctor: '::',
+						_0: _SwiftsNamesake$proper_keyboard$Keyboard_Key$Windows,
+						_1: {
+							ctor: '::',
+							_0: _SwiftsNamesake$proper_keyboard$Keyboard_Key$Command,
+							_1: {
+								ctor: '::',
+								_0: _SwiftsNamesake$proper_keyboard$Keyboard_Key$ChromeSearch,
+								_1: {ctor: '[]'}
+							}
+						}
+					}),
+				_p1._0) ? _elm_lang$core$Maybe$Just(91) : _elm_lang$core$Maybe$Nothing;
+		case 'Windows':
+			return _elm_lang$core$Maybe$Just(91);
+		case 'Command':
+			return _elm_lang$core$Maybe$Just(91);
+		case 'ChromeSearch':
+			return _elm_lang$core$Maybe$Just(91);
+		case 'NumpadZero':
+			return _elm_lang$core$Maybe$Just(96);
+		case 'NumpadOne':
+			return _elm_lang$core$Maybe$Just(97);
+		case 'NumpadTwo':
+			return _elm_lang$core$Maybe$Just(98);
+		case 'NumpadThree':
+			return _elm_lang$core$Maybe$Just(99);
+		case 'NumpadFour':
+			return _elm_lang$core$Maybe$Just(100);
+		case 'NumpadFive':
+			return _elm_lang$core$Maybe$Just(101);
+		case 'NumpadSix':
+			return _elm_lang$core$Maybe$Just(102);
+		case 'NumpadSeven':
+			return _elm_lang$core$Maybe$Just(103);
+		case 'NumpadEight':
+			return _elm_lang$core$Maybe$Just(104);
+		case 'NumpadNine':
+			return _elm_lang$core$Maybe$Just(105);
+		case 'Multiply':
+			return _elm_lang$core$Maybe$Just(106);
+		case 'Add':
+			return _elm_lang$core$Maybe$Just(107);
+		case 'Subtract':
+			return _elm_lang$core$Maybe$Just(109);
+		case 'Decimal':
+			return _elm_lang$core$Maybe$Just(110);
+		case 'Divide':
+			return _elm_lang$core$Maybe$Just(111);
+		case 'F1':
+			return _elm_lang$core$Maybe$Just(112);
+		case 'F2':
+			return _elm_lang$core$Maybe$Just(113);
+		case 'F3':
+			return _elm_lang$core$Maybe$Just(114);
+		case 'F4':
+			return _elm_lang$core$Maybe$Just(115);
+		case 'F5':
+			return _elm_lang$core$Maybe$Just(116);
+		case 'F6':
+			return _elm_lang$core$Maybe$Just(117);
+		case 'F7':
+			return _elm_lang$core$Maybe$Just(118);
+		case 'F8':
+			return _elm_lang$core$Maybe$Just(119);
+		case 'F9':
+			return _elm_lang$core$Maybe$Just(120);
+		case 'F10':
+			return _elm_lang$core$Maybe$Just(121);
+		case 'F11':
+			return _elm_lang$core$Maybe$Just(122);
+		case 'F12':
+			return _elm_lang$core$Maybe$Just(123);
+		case 'NumLock':
+			return _elm_lang$core$Maybe$Just(144);
+		case 'ScrollLock':
+			return _elm_lang$core$Maybe$Just(145);
+		default:
+			return _elm_lang$core$Maybe$Nothing;
+	}
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$PauseBreak = {ctor: 'PauseBreak'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$PrintScreen = {ctor: 'PrintScreen'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Insert = {ctor: 'Insert'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Nine = {ctor: 'Nine'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Eight = {ctor: 'Eight'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Seven = {ctor: 'Seven'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Six = {ctor: 'Six'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Five = {ctor: 'Five'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Four = {ctor: 'Four'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Three = {ctor: 'Three'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Two = {ctor: 'Two'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$One = {ctor: 'One'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Zero = {ctor: 'Zero'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Home = {ctor: 'Home'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$End = {ctor: 'End'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$PageDown = {ctor: 'PageDown'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$PageUp = {ctor: 'PageUp'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Delete = {ctor: 'Delete'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Backspace = {ctor: 'Backspace'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Enter = {ctor: 'Enter'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Escape = {ctor: 'Escape'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Spacebar = {ctor: 'Spacebar'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$CapsLock = {ctor: 'CapsLock'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Tab = {ctor: 'Tab'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Alt = {ctor: 'Alt'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Ctrl = function (a) {
+	return {ctor: 'Ctrl', _0: a};
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Shift = function (a) {
+	return {ctor: 'Shift', _0: a};
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Down = {ctor: 'Down'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Up = {ctor: 'Up'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Right = {ctor: 'Right'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Left = {ctor: 'Left'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Z = {ctor: 'Z'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Y = {ctor: 'Y'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$X = {ctor: 'X'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$W = {ctor: 'W'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$V = {ctor: 'V'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$U = {ctor: 'U'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$T = {ctor: 'T'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$S = {ctor: 'S'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$R = {ctor: 'R'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$Q = {ctor: 'Q'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$P = {ctor: 'P'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$O = {ctor: 'O'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$N = {ctor: 'N'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$M = {ctor: 'M'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$L = {ctor: 'L'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$K = {ctor: 'K'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$J = {ctor: 'J'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$I = {ctor: 'I'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$H = {ctor: 'H'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$G = {ctor: 'G'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$F = {ctor: 'F'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$E = {ctor: 'E'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$D = {ctor: 'D'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$C = {ctor: 'C'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$B = {ctor: 'B'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$A = {ctor: 'A'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$fromCode = function (code) {
+	var _p2 = code;
+	switch (_p2) {
+		case 8:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Backspace;
+		case 9:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Tab;
+		case 13:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Enter;
+		case 16:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Shift(_elm_lang$core$Maybe$Nothing);
+		case 17:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Ctrl(_elm_lang$core$Maybe$Nothing);
+		case 18:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Alt;
+		case 19:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$PauseBreak;
+		case 20:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$CapsLock;
+		case 27:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Escape;
+		case 32:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Spacebar;
+		case 33:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$PageUp;
+		case 34:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$PageDown;
+		case 35:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$End;
+		case 36:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Home;
+		case 37:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Left;
+		case 38:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Up;
+		case 39:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Right;
+		case 40:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Down;
+		case 44:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$PrintScreen;
+		case 45:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Insert;
+		case 46:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Delete;
+		case 48:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Zero;
+		case 49:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$One;
+		case 50:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Two;
+		case 51:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Three;
+		case 52:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Four;
+		case 53:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Five;
+		case 54:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Six;
+		case 55:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Seven;
+		case 56:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Eight;
+		case 57:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Nine;
+		case 65:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$A;
+		case 66:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$B;
+		case 67:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$C;
+		case 68:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$D;
+		case 69:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$E;
+		case 70:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F;
+		case 71:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$G;
+		case 72:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$H;
+		case 73:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$I;
+		case 74:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$J;
+		case 75:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$K;
+		case 76:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$L;
+		case 77:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$M;
+		case 78:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$N;
+		case 79:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$O;
+		case 80:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$P;
+		case 81:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Q;
+		case 82:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$R;
+		case 83:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$S;
+		case 84:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$T;
+		case 85:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$U;
+		case 86:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$V;
+		case 87:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$W;
+		case 88:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$X;
+		case 89:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Y;
+		case 90:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Z;
+		case 91:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Ambiguous(
+				{
+					ctor: '::',
+					_0: _SwiftsNamesake$proper_keyboard$Keyboard_Key$Windows,
+					_1: {
+						ctor: '::',
+						_0: _SwiftsNamesake$proper_keyboard$Keyboard_Key$Command,
+						_1: {
+							ctor: '::',
+							_0: _SwiftsNamesake$proper_keyboard$Keyboard_Key$ChromeSearch,
+							_1: {ctor: '[]'}
+						}
+					}
+				});
+		case 96:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadZero;
+		case 97:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadOne;
+		case 98:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadTwo;
+		case 99:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadThree;
+		case 100:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadFour;
+		case 101:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadFive;
+		case 102:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadSix;
+		case 103:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadSeven;
+		case 104:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadEight;
+		case 105:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumpadNine;
+		case 106:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Multiply;
+		case 107:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Add;
+		case 109:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Subtract;
+		case 110:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Decimal;
+		case 111:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Divide;
+		case 112:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F1;
+		case 113:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F2;
+		case 114:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F3;
+		case 115:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F4;
+		case 116:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F5;
+		case 117:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F6;
+		case 118:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F7;
+		case 119:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F8;
+		case 120:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F9;
+		case 121:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F10;
+		case 122:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F11;
+		case 123:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$F12;
+		case 144:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$NumLock;
+		case 145:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$ScrollLock;
+		default:
+			return _SwiftsNamesake$proper_keyboard$Keyboard_Key$Unknown(code);
+	}
+};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$RightHand = {ctor: 'RightHand'};
+var _SwiftsNamesake$proper_keyboard$Keyboard_Key$LeftHand = {ctor: 'LeftHand'};
+
+var _Gizra$elm_keyboard_event$Keyboard_Event$decodeKey = _elm_lang$core$Json_Decode$maybe(
+	A2(
+		_elm_lang$core$Json_Decode$andThen,
+		function (key) {
+			return _elm_lang$core$String$isEmpty(key) ? _elm_lang$core$Json_Decode$fail('empty key') : _elm_lang$core$Json_Decode$succeed(key);
+		},
+		A2(_elm_lang$core$Json_Decode$field, 'key', _elm_lang$core$Json_Decode$string)));
+var _Gizra$elm_keyboard_event$Keyboard_Event$decodeNonZero = A2(
+	_elm_lang$core$Json_Decode$andThen,
+	function (code) {
+		return _elm_lang$core$Native_Utils.eq(code, 0) ? _elm_lang$core$Json_Decode$fail('code was zero') : _elm_lang$core$Json_Decode$succeed(code);
+	},
+	_elm_lang$core$Json_Decode$int);
+var _Gizra$elm_keyboard_event$Keyboard_Event$decodeKeyCode = _elm_lang$core$Json_Decode$oneOf(
+	{
+		ctor: '::',
+		_0: A2(_elm_lang$core$Json_Decode$field, 'keyCode', _Gizra$elm_keyboard_event$Keyboard_Event$decodeNonZero),
+		_1: {
+			ctor: '::',
+			_0: A2(_elm_lang$core$Json_Decode$field, 'which', _Gizra$elm_keyboard_event$Keyboard_Event$decodeNonZero),
+			_1: {
+				ctor: '::',
+				_0: A2(_elm_lang$core$Json_Decode$field, 'charCode', _Gizra$elm_keyboard_event$Keyboard_Event$decodeNonZero),
+				_1: {
+					ctor: '::',
+					_0: _elm_lang$core$Json_Decode$succeed(0),
+					_1: {ctor: '[]'}
+				}
+			}
+		}
+	});
+var _Gizra$elm_keyboard_event$Keyboard_Event$KeyboardEvent = F7(
+	function (a, b, c, d, e, f, g) {
+		return {altKey: a, ctrlKey: b, key: c, keyCode: d, metaKey: e, repeat: f, shiftKey: g};
+	});
+var _Gizra$elm_keyboard_event$Keyboard_Event$decodeKeyboardEvent = A8(
+	_elm_lang$core$Json_Decode$map7,
+	_Gizra$elm_keyboard_event$Keyboard_Event$KeyboardEvent,
+	A2(_elm_lang$core$Json_Decode$field, 'altKey', _elm_lang$core$Json_Decode$bool),
+	A2(_elm_lang$core$Json_Decode$field, 'ctrlKey', _elm_lang$core$Json_Decode$bool),
+	_Gizra$elm_keyboard_event$Keyboard_Event$decodeKey,
+	A2(_elm_lang$core$Json_Decode$map, _SwiftsNamesake$proper_keyboard$Keyboard_Key$fromCode, _Gizra$elm_keyboard_event$Keyboard_Event$decodeKeyCode),
+	A2(_elm_lang$core$Json_Decode$field, 'metaKey', _elm_lang$core$Json_Decode$bool),
+	A2(_elm_lang$core$Json_Decode$field, 'repeat', _elm_lang$core$Json_Decode$bool),
+	A2(_elm_lang$core$Json_Decode$field, 'shiftKey', _elm_lang$core$Json_Decode$bool));
+var _Gizra$elm_keyboard_event$Keyboard_Event$considerKeyboardEvent = function (func) {
+	return A2(
+		_elm_lang$core$Json_Decode$andThen,
+		function (event) {
+			var _p0 = func(event);
+			if (_p0.ctor === 'Just') {
+				return _elm_lang$core$Json_Decode$succeed(_p0._0);
+			} else {
+				return _elm_lang$core$Json_Decode$fail('Ignoring keyboard event');
+			}
+		},
+		_Gizra$elm_keyboard_event$Keyboard_Event$decodeKeyboardEvent);
 };
 
 var _elm_lang$core$Color$fmod = F2(
@@ -13558,325 +15049,377 @@ var _rtfeldman$elm_css$Css_Colors$aqua = _rtfeldman$elm_css$Css$hex('7FDBFF');
 var _rtfeldman$elm_css$Css_Colors$blue = _rtfeldman$elm_css$Css$hex('0074D9');
 var _rtfeldman$elm_css$Css_Colors$navy = _rtfeldman$elm_css$Css$hex('001F3F');
 
-var _user$project$NoughtsAndCrosses$update = F2(
-	function (message, model) {
-		var _p0 = message;
-		switch (_p0.ctor) {
-			case 'PlayMove':
-				var _p2 = _p0._0;
-				var _p1 = _p0._1;
-				return _elm_lang$core$Native_Utils.update(
-					model,
-					{
-						board: A3(_elm_lang$core$Dict$insert, _p1, _p2, model.board),
-						previousMoves: {
-							ctor: '::',
-							_0: {ctor: '_Tuple2', _0: _p2, _1: _p1},
-							_1: model.previousMoves
-						},
-						futureMoves: {ctor: '[]'}
-					});
-			case 'HistoryBack':
-				var _p3 = model.previousMoves;
-				if (_p3.ctor === '[]') {
-					return model;
-				} else {
-					var _p4 = _p3._0._1;
-					return _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							board: A2(_elm_lang$core$Dict$remove, _p4, model.board),
-							previousMoves: _p3._1,
-							futureMoves: {
-								ctor: '::',
-								_0: {ctor: '_Tuple2', _0: _p3._0._0, _1: _p4},
-								_1: model.futureMoves
-							}
-						});
-				}
+var _user$project$EditorElm$filterPairs = function (l) {
+	var filterFun = function (_p0) {
+		var _p1 = _p0;
+		return _p1._1 ? _elm_lang$core$Maybe$Just(_p1._0) : _elm_lang$core$Maybe$Nothing;
+	};
+	return A2(_elm_lang$core$List$filterMap, filterFun, l);
+};
+var _user$project$EditorElm$interpretMetaKey = F2(
+	function (s, model) {
+		var _p2 = s;
+		return model;
+	});
+var _user$project$EditorElm$unindentLine = function (model) {
+	return A2(_elm_lang$core$String$startsWith, '    ', model.currentLeft) ? _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			currentLeft: A2(_elm_lang$core$String$dropLeft, 4, model.currentLeft)
+		}) : model;
+};
+var _user$project$EditorElm$indentLine = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			currentLeft: A2(_elm_lang$core$Basics_ops['++'], '    ', model.currentLeft)
+		});
+};
+var _user$project$EditorElm$deleteToStartOfLine = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{currentLeft: ''});
+};
+var _user$project$EditorElm$deleteToEndOfLine = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{currentRight: ''});
+};
+var _user$project$EditorElm$interpretAltKey = F2(
+	function (s, model) {
+		var _p3 = s;
+		switch (_p3) {
+			case 'Delete':
+				return _user$project$EditorElm$deleteToEndOfLine(model);
+			case 'Backspace':
+				return _user$project$EditorElm$deleteToStartOfLine(model);
 			default:
-				var _p5 = model.futureMoves;
-				if (_p5.ctor === '[]') {
-					return model;
-				} else {
-					var _p7 = _p5._0._0;
-					var _p6 = _p5._0._1;
-					return _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							board: A3(_elm_lang$core$Dict$insert, _p6, _p7, model.board),
-							previousMoves: {
-								ctor: '::',
-								_0: {ctor: '_Tuple2', _0: _p7, _1: _p6},
-								_1: model.previousMoves
-							},
-							futureMoves: _p5._1
-						});
-				}
+				return model;
 		}
 	});
-var _user$project$NoughtsAndCrosses$allPossibleLines = {
-	ctor: '::',
-	_0: {
-		ctor: '::',
-		_0: {ctor: '_Tuple2', _0: 0, _1: 0},
-		_1: {
-			ctor: '::',
-			_0: {ctor: '_Tuple2', _0: 1, _1: 0},
-			_1: {
-				ctor: '::',
-				_0: {ctor: '_Tuple2', _0: 2, _1: 0},
-				_1: {ctor: '[]'}
-			}
+var _user$project$EditorElm$insertAtCursor = F2(
+	function (s, model) {
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{
+				currentLeft: A2(_elm_lang$core$Basics_ops['++'], model.currentLeft, s)
+			});
+	});
+var _user$project$EditorElm$interpretShiftKey = F2(
+	function (s, model) {
+		var _p4 = s;
+		switch (_p4) {
+			case 'Tab':
+				return _user$project$EditorElm$unindentLine(model);
+			case 'Shift':
+				return model;
+			default:
+				return A2(_user$project$EditorElm$insertAtCursor, s, model);
 		}
-	},
-	_1: {
-		ctor: '::',
-		_0: {
-			ctor: '::',
-			_0: {ctor: '_Tuple2', _0: 0, _1: 1},
-			_1: {
-				ctor: '::',
-				_0: {ctor: '_Tuple2', _0: 1, _1: 1},
-				_1: {
-					ctor: '::',
-					_0: {ctor: '_Tuple2', _0: 2, _1: 1},
-					_1: {ctor: '[]'}
-				}
-			}
-		},
-		_1: {
-			ctor: '::',
-			_0: {
-				ctor: '::',
-				_0: {ctor: '_Tuple2', _0: 0, _1: 2},
-				_1: {
-					ctor: '::',
-					_0: {ctor: '_Tuple2', _0: 1, _1: 2},
-					_1: {
-						ctor: '::',
-						_0: {ctor: '_Tuple2', _0: 2, _1: 2},
-						_1: {ctor: '[]'}
-					}
-				}
-			},
-			_1: {
-				ctor: '::',
-				_0: {
-					ctor: '::',
-					_0: {ctor: '_Tuple2', _0: 0, _1: 0},
-					_1: {
-						ctor: '::',
-						_0: {ctor: '_Tuple2', _0: 0, _1: 1},
-						_1: {
-							ctor: '::',
-							_0: {ctor: '_Tuple2', _0: 0, _1: 2},
-							_1: {ctor: '[]'}
-						}
-					}
-				},
-				_1: {
-					ctor: '::',
-					_0: {
-						ctor: '::',
-						_0: {ctor: '_Tuple2', _0: 1, _1: 0},
-						_1: {
-							ctor: '::',
-							_0: {ctor: '_Tuple2', _0: 1, _1: 1},
-							_1: {
-								ctor: '::',
-								_0: {ctor: '_Tuple2', _0: 1, _1: 2},
-								_1: {ctor: '[]'}
-							}
-						}
-					},
-					_1: {
-						ctor: '::',
-						_0: {
-							ctor: '::',
-							_0: {ctor: '_Tuple2', _0: 2, _1: 0},
-							_1: {
-								ctor: '::',
-								_0: {ctor: '_Tuple2', _0: 2, _1: 1},
-								_1: {
-									ctor: '::',
-									_0: {ctor: '_Tuple2', _0: 2, _1: 2},
-									_1: {ctor: '[]'}
-								}
-							}
-						},
-						_1: {
-							ctor: '::',
-							_0: {
-								ctor: '::',
-								_0: {ctor: '_Tuple2', _0: 0, _1: 0},
-								_1: {
-									ctor: '::',
-									_0: {ctor: '_Tuple2', _0: 1, _1: 1},
-									_1: {
-										ctor: '::',
-										_0: {ctor: '_Tuple2', _0: 2, _1: 2},
-										_1: {ctor: '[]'}
-									}
-								}
-							},
-							_1: {
-								ctor: '::',
-								_0: {
-									ctor: '::',
-									_0: {ctor: '_Tuple2', _0: 2, _1: 0},
-									_1: {
-										ctor: '::',
-										_0: {ctor: '_Tuple2', _0: 1, _1: 1},
-										_1: {
-											ctor: '::',
-											_0: {ctor: '_Tuple2', _0: 0, _1: 2},
-											_1: {ctor: '[]'}
-										}
-									}
-								},
-								_1: {ctor: '[]'}
-							}
-						}
-					}
-				}
-			}
+	});
+var _user$project$EditorElm$deleteChar = function (model) {
+	var _p5 = model.currentRight;
+	if (_p5 === '') {
+		var _p6 = model.downLines;
+		if (_p6.ctor === '[]') {
+			return model;
+		} else {
+			return _elm_lang$core$Native_Utils.update(
+				model,
+				{currentRight: _p6._0, downLines: _p6._1});
+		}
+	} else {
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{
+				currentRight: A2(_elm_lang$core$String$dropLeft, 1, model.currentRight)
+			});
+	}
+};
+var _user$project$EditorElm$backspaceChar = function (model) {
+	var _p7 = model.currentLeft;
+	if (_p7 === '') {
+		var _p8 = model.upLines;
+		if (_p8.ctor === '[]') {
+			return model;
+		} else {
+			return _elm_lang$core$Native_Utils.update(
+				model,
+				{currentLeft: _p8._0, upLines: _p8._1});
+		}
+	} else {
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{
+				currentLeft: A2(_elm_lang$core$String$dropRight, 1, model.currentLeft)
+			});
+	}
+};
+var _user$project$EditorElm$deleteCurrentLine = function (model) {
+	var position = _elm_lang$core$String$length(model.currentLeft);
+	var _p9 = {ctor: '_Tuple2', _0: model.downLines, _1: model.upLines};
+	if (_p9._0.ctor === '::') {
+		var _p10 = _p9._0._0;
+		var right = A2(_elm_lang$core$String$dropLeft, position, _p10);
+		var left = A2(_elm_lang$core$String$left, position, _p10);
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{currentLeft: left, currentRight: right, downLines: _p9._0._1});
+	} else {
+		if (_p9._1.ctor === '[]') {
+			return _elm_lang$core$Native_Utils.update(
+				model,
+				{currentLeft: '', currentRight: ''});
+		} else {
+			var _p11 = _p9._1._0;
+			var right = A2(_elm_lang$core$String$dropLeft, position, _p11);
+			var left = A2(_elm_lang$core$String$left, position, _p11);
+			return _elm_lang$core$Native_Utils.update(
+				model,
+				{currentLeft: left, currentRight: right, upLines: _p9._1._1});
 		}
 	}
 };
-var _user$project$NoughtsAndCrosses$calculateLineStates = function (board) {
-	return A2(
-		_elm_lang$core$List$map,
-		_elm_lang$core$List$map(
-			function (bc) {
-				return A2(_elm_lang$core$Dict$get, bc, board);
-			}),
-		_user$project$NoughtsAndCrosses$allPossibleLines);
+var _user$project$EditorElm$joinNextLine = function (model) {
+	var _p12 = model.downLines;
+	if (_p12.ctor === '[]') {
+		return model;
+	} else {
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{
+				currentRight: A2(
+					_elm_lang$core$Basics_ops['++'],
+					model.currentRight,
+					A2(_elm_lang$core$Basics_ops['++'], ' ', _p12._0)),
+				downLines: _p12._1
+			});
+	}
 };
-var _user$project$NoughtsAndCrosses$initialModel = {
-	board: _elm_lang$core$Dict$empty,
-	previousMoves: {ctor: '[]'},
-	futureMoves: {ctor: '[]'}
+var _user$project$EditorElm$interpretCtrlKey = F2(
+	function (s, model) {
+		var _p13 = s;
+		switch (_p13) {
+			case 'd':
+				return _user$project$EditorElm$deleteCurrentLine(model);
+			case 'j':
+				return _user$project$EditorElm$joinNextLine(model);
+			default:
+				return model;
+		}
+	});
+var _user$project$EditorElm$goToLineEnd = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			currentRight: '',
+			currentLeft: A2(_elm_lang$core$Basics_ops['++'], model.currentLeft, model.currentRight)
+		});
 };
-var _user$project$NoughtsAndCrosses$tableStyleElement = function () {
-	var boardLinesStyle = function (f) {
-		return A3(
-			f,
+var _user$project$EditorElm$goToLineStart = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			currentLeft: '',
+			currentRight: A2(_elm_lang$core$Basics_ops['++'], model.currentLeft, model.currentRight)
+		});
+};
+var _user$project$EditorElm$moveRight = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			currentRight: A2(_elm_lang$core$String$dropLeft, 1, model.currentRight),
+			currentLeft: A2(
+				_elm_lang$core$Basics_ops['++'],
+				model.currentLeft,
+				A2(_elm_lang$core$String$left, 1, model.currentRight))
+		});
+};
+var _user$project$EditorElm$moveLeft = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			currentLeft: A2(_elm_lang$core$String$dropRight, 1, model.currentLeft),
+			currentRight: A2(
+				_elm_lang$core$Basics_ops['++'],
+				A2(_elm_lang$core$String$right, 1, model.currentLeft),
+				model.currentRight)
+		});
+};
+var _user$project$EditorElm$moveDown = function (model) {
+	var _p14 = model.downLines;
+	if (_p14.ctor === '[]') {
+		return model;
+	} else {
+		var _p15 = _p14._0;
+		var position = _elm_lang$core$String$length(model.currentLeft);
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{
+				downLines: _p14._1,
+				upLines: {
+					ctor: '::',
+					_0: A2(_elm_lang$core$Basics_ops['++'], model.currentLeft, model.currentRight),
+					_1: model.upLines
+				},
+				currentLeft: A2(_elm_lang$core$String$left, position, _p15),
+				currentRight: A2(_elm_lang$core$String$dropLeft, position, _p15)
+			});
+	}
+};
+var _user$project$EditorElm$moveUp = function (model) {
+	var _p16 = model.upLines;
+	if (_p16.ctor === '[]') {
+		return model;
+	} else {
+		var _p17 = _p16._0;
+		var position = _elm_lang$core$String$length(model.currentLeft);
+		return _elm_lang$core$Native_Utils.update(
+			model,
+			{
+				upLines: _p16._1,
+				downLines: {
+					ctor: '::',
+					_0: A2(_elm_lang$core$Basics_ops['++'], model.currentLeft, model.currentRight),
+					_1: model.downLines
+				},
+				currentLeft: A2(_elm_lang$core$String$left, position, _p17),
+				currentRight: A2(_elm_lang$core$String$dropLeft, position, _p17)
+			});
+	}
+};
+var _user$project$EditorElm$insertNewLine = function (model) {
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{
+			upLines: {ctor: '::', _0: model.currentLeft, _1: model.upLines},
+			currentLeft: ''
+		});
+};
+var _user$project$EditorElm$interpretKey = F2(
+	function (s, model) {
+		var _p18 = s;
+		switch (_p18) {
+			case 'Enter':
+				return _user$project$EditorElm$insertNewLine(model);
+			case 'ArrowUp':
+				return _user$project$EditorElm$moveUp(model);
+			case 'ArrowDown':
+				return _user$project$EditorElm$moveDown(model);
+			case 'ArrowRight':
+				return _user$project$EditorElm$moveRight(model);
+			case 'ArrowLeft':
+				return _user$project$EditorElm$moveLeft(model);
+			case 'Backspace':
+				return _user$project$EditorElm$backspaceChar(model);
+			case 'Delete':
+				return _user$project$EditorElm$deleteChar(model);
+			case 'Home':
+				return _user$project$EditorElm$goToLineStart(model);
+			case 'End':
+				return _user$project$EditorElm$goToLineEnd(model);
+			case 'Tab':
+				return _user$project$EditorElm$indentLine(model);
+			case 'Meta':
+				return model;
+			default:
+				return A2(_user$project$EditorElm$insertAtCursor, s, model);
+		}
+	});
+var _user$project$EditorElm$bareUpdate = F2(
+	function (msg, model) {
+		var _p19 = msg;
+		switch (_p19.ctor) {
+			case 'ToggleLineNumbers':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{showLineNumbers: !model.showLineNumbers});
+			case 'ToggleColumnNumber':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{showColumnNumber: !model.showColumnNumber});
+			default:
+				var _p22 = _p19._0;
+				var _p20 = _p22.key;
+				if (_p20.ctor === 'Just') {
+					var _p21 = _p20._0;
+					return _p22.ctrlKey ? A2(_user$project$EditorElm$interpretCtrlKey, _p21, model) : (_p22.altKey ? A2(_user$project$EditorElm$interpretAltKey, _p21, model) : (_p22.shiftKey ? A2(_user$project$EditorElm$interpretShiftKey, _p21, model) : (_p22.metaKey ? A2(_user$project$EditorElm$interpretMetaKey, _p21, model) : A2(_user$project$EditorElm$interpretKey, _p21, model))));
+				} else {
+					return model;
+				}
+		}
+	});
+var _user$project$EditorElm$update = F2(
+	function (msg, model) {
+		return {
+			ctor: '_Tuple2',
+			_0: A2(_user$project$EditorElm$bareUpdate, msg, model),
+			_1: _elm_lang$core$Platform_Cmd$none
+		};
+	});
+var _user$project$EditorElm$beginnerContent = 'module Main exposing (..)\n\nimport Html exposing (..)\n\n\nmain =\n    beginnerProgram\n        { model = model\n        , update = update\n        , view = view\n        }\n';
+var _user$project$EditorElm$init = function () {
+	var programLines = _elm_lang$core$String$lines(_user$project$EditorElm$beginnerContent);
+	var currentRight = A2(
+		_elm_lang$core$Maybe$withDefault,
+		'',
+		_elm_lang$core$List$head(programLines));
+	return {
+		ctor: '_Tuple2',
+		_0: {
+			upLines: {ctor: '[]'},
+			downLines: A2(_elm_lang$core$List$drop, 1, programLines),
+			currentLeft: '',
+			currentRight: currentRight,
+			showLineNumbers: true,
+			showColumnNumber: true
+		},
+		_1: _elm_lang$core$Platform_Cmd$none
+	};
+}();
+var _user$project$EditorElm$subscriptions = function (model) {
+	return _elm_lang$core$Platform_Sub$none;
+};
+var _user$project$EditorElm$styles = function (_p23) {
+	return _elm_lang$html$Html_Attributes$style(
+		_rtfeldman$elm_css$Css$asPairs(_p23));
+};
+var _user$project$EditorElm$statusCSS = _user$project$EditorElm$styles(
+	{
+		ctor: '::',
+		_0: _rtfeldman$elm_css$Css$fontWeight(_rtfeldman$elm_css$Css$bold),
+		_1: {ctor: '[]'}
+	});
+var _user$project$EditorElm$editorStyle = _user$project$EditorElm$styles(
+	{
+		ctor: '::',
+		_0: A3(
+			_rtfeldman$elm_css$Css$border3,
 			_rtfeldman$elm_css$Css$px(1),
 			_rtfeldman$elm_css$Css$solid,
-			_rtfeldman$elm_css$Css_Colors$black);
-	};
-	var snippets = {
-		ctor: '::',
-		_0: A2(
-			_rtfeldman$elm_css$Css$selector,
-			'table',
-			{
-				ctor: '::',
-				_0: _rtfeldman$elm_css$Css$borderStyle(_rtfeldman$elm_css$Css$none),
-				_1: {
-					ctor: '::',
-					_0: _rtfeldman$elm_css$Css$borderCollapse(_rtfeldman$elm_css$Css$collapse),
-					_1: {ctor: '[]'}
-				}
-			}),
+			_rtfeldman$elm_css$Css_Colors$black),
 		_1: {
 			ctor: '::',
-			_0: A2(
-				_rtfeldman$elm_css$Css$selector,
-				'table td',
-				{
-					ctor: '::',
-					_0: boardLinesStyle(_rtfeldman$elm_css$Css$borderLeft3),
-					_1: {
-						ctor: '::',
-						_0: boardLinesStyle(_rtfeldman$elm_css$Css$borderTop3),
-						_1: {ctor: '[]'}
-					}
-				}),
+			_0: _rtfeldman$elm_css$Css$whiteSpace(_rtfeldman$elm_css$Css$pre),
 			_1: {
 				ctor: '::',
-				_0: A2(
-					_rtfeldman$elm_css$Css$selector,
-					'table td:first-child',
+				_0: _rtfeldman$elm_css$Css$fontFamilies(
 					{
 						ctor: '::',
-						_0: _rtfeldman$elm_css$Css$borderLeftStyle(_rtfeldman$elm_css$Css$none),
-						_1: {ctor: '[]'}
-					}),
-				_1: {
-					ctor: '::',
-					_0: A2(
-						_rtfeldman$elm_css$Css$selector,
-						'table tr:first-child td',
-						{
+						_0: 'monospace',
+						_1: {
 							ctor: '::',
-							_0: _rtfeldman$elm_css$Css$borderTopStyle(_rtfeldman$elm_css$Css$none),
+							_0: 'monospace',
 							_1: {ctor: '[]'}
-						}),
-					_1: {ctor: '[]'}
-				}
+						}
+					}),
+				_1: {ctor: '[]'}
 			}
 		}
-	};
-	var stylesheet = _rtfeldman$elm_css$Css$stylesheet(snippets);
-	var css = function (_) {
-		return _.css;
-	}(
-		_rtfeldman$elm_css$Css$compile(
-			{
-				ctor: '::',
-				_0: stylesheet,
-				_1: {ctor: '[]'}
-			}));
-	return A3(
-		_elm_lang$html$Html$node,
-		'style',
-		{ctor: '[]'},
-		{
-			ctor: '::',
-			_0: _elm_lang$html$Html$text(css),
-			_1: {ctor: '[]'}
-		});
-}();
-var _user$project$NoughtsAndCrosses$styles = function (_p8) {
-	return _elm_lang$html$Html_Attributes$style(
-		_rtfeldman$elm_css$Css$asPairs(_p8));
-};
-var _user$project$NoughtsAndCrosses$playerCSS = function (mPlayer) {
-	var extraStyles = function () {
-		var _p9 = mPlayer;
-		if (_p9.ctor === 'Just') {
-			if (_p9._0.ctor === 'Noughts') {
-				return {
-					ctor: '::',
-					_0: _rtfeldman$elm_css$Css$color(_rtfeldman$elm_css$Css_Colors$orange),
-					_1: {ctor: '[]'}
-				};
-			} else {
-				return {
-					ctor: '::',
-					_0: _rtfeldman$elm_css$Css$color(_rtfeldman$elm_css$Css_Colors$blue),
-					_1: {ctor: '[]'}
-				};
-			}
-		} else {
-			return {ctor: '[]'};
-		}
-	}();
-	return _user$project$NoughtsAndCrosses$styles(
-		A2(
-			_elm_lang$core$Basics_ops['++'],
-			extraStyles,
-			{
-				ctor: '::',
-				_0: _rtfeldman$elm_css$Css$fontWeight(_rtfeldman$elm_css$Css$bold),
-				_1: {ctor: '[]'}
-			}));
-};
-var _user$project$NoughtsAndCrosses$flexbox = F2(
+	});
+var _user$project$EditorElm$flexbox = F2(
 	function (direction, extraStyles) {
-		return _user$project$NoughtsAndCrosses$styles(
+		return _user$project$EditorElm$styles(
 			A2(
 				_elm_lang$core$Basics_ops['++'],
 				extraStyles,
@@ -13890,369 +15433,318 @@ var _user$project$NoughtsAndCrosses$flexbox = F2(
 					}
 				}));
 	});
-var _user$project$NoughtsAndCrosses$gameCSS = A2(
-	_user$project$NoughtsAndCrosses$flexbox,
-	_rtfeldman$elm_css$Css$column,
-	{
+var _user$project$EditorElm$currentLineCSS = function () {
+	var extraStyles = {
 		ctor: '::',
-		_0: _rtfeldman$elm_css$Css$alignItems(_rtfeldman$elm_css$Css$center),
+		_0: _rtfeldman$elm_css$Css$backgroundColor(
+			_rtfeldman$elm_css$Css$hex('b7afdb')),
 		_1: {ctor: '[]'}
-	});
-var _user$project$NoughtsAndCrosses$controlsCSS = A2(
-	_user$project$NoughtsAndCrosses$flexbox,
-	_rtfeldman$elm_css$Css$row,
-	{ctor: '[]'});
-var _user$project$NoughtsAndCrosses$statusCSS = _user$project$NoughtsAndCrosses$styles(
+	};
+	return A2(_user$project$EditorElm$flexbox, _rtfeldman$elm_css$Css$row, extraStyles);
+}();
+var _user$project$EditorElm$lineCSS = _user$project$EditorElm$styles(
 	{
 		ctor: '::',
-		_0: _rtfeldman$elm_css$Css$fontWeight(_rtfeldman$elm_css$Css$bold),
-		_1: {ctor: '[]'}
-	});
-var _user$project$NoughtsAndCrosses$boardCSS = _user$project$NoughtsAndCrosses$styles(
-	{
-		ctor: '::',
-		_0: _rtfeldman$elm_css$Css$marginTop(
-			_rtfeldman$elm_css$Css$em(2)),
-		_1: {
-			ctor: '::',
-			_0: _rtfeldman$elm_css$Css$marginBottom(
-				_rtfeldman$elm_css$Css$em(2)),
-			_1: {ctor: '[]'}
-		}
-	});
-var _user$project$NoughtsAndCrosses$squareCSS = _user$project$NoughtsAndCrosses$styles(
-	{
-		ctor: '::',
-		_0: _rtfeldman$elm_css$Css$width(
-			_rtfeldman$elm_css$Css$px(30)),
-		_1: {
-			ctor: '::',
-			_0: _rtfeldman$elm_css$Css$height(
-				_rtfeldman$elm_css$Css$px(30)),
-			_1: {
-				ctor: '::',
-				_0: _rtfeldman$elm_css$Css$textAlign(_rtfeldman$elm_css$Css$center),
-				_1: {ctor: '[]'}
-			}
-		}
-	});
-var _user$project$NoughtsAndCrosses$historyTextCSS = _user$project$NoughtsAndCrosses$styles(
-	{
-		ctor: '::',
-		_0: _rtfeldman$elm_css$Css$marginLeft(
+		_0: _rtfeldman$elm_css$Css$minHeight(
 			_rtfeldman$elm_css$Css$em(1)),
+		_1: {ctor: '[]'}
+	});
+var _user$project$EditorElm$lineNumberCSS = _user$project$EditorElm$styles(
+	{
+		ctor: '::',
+		_0: A3(
+			_rtfeldman$elm_css$Css$borderRight3,
+			_rtfeldman$elm_css$Css$px(1),
+			_rtfeldman$elm_css$Css$solid,
+			_rtfeldman$elm_css$Css_Colors$black),
 		_1: {
 			ctor: '::',
-			_0: _rtfeldman$elm_css$Css$marginRight(
-				_rtfeldman$elm_css$Css$em(1)),
+			_0: _rtfeldman$elm_css$Css$backgroundColor(
+				_rtfeldman$elm_css$Css$hex('664cdb')),
 			_1: {ctor: '[]'}
 		}
 	});
-var _user$project$NoughtsAndCrosses$Model = F3(
-	function (a, b, c) {
-		return {board: a, previousMoves: b, futureMoves: c};
-	});
-var _user$project$NoughtsAndCrosses$Crosses = {ctor: 'Crosses'};
-var _user$project$NoughtsAndCrosses$crossesCSS = _user$project$NoughtsAndCrosses$playerCSS(
-	_elm_lang$core$Maybe$Just(_user$project$NoughtsAndCrosses$Crosses));
-var _user$project$NoughtsAndCrosses$Noughts = {ctor: 'Noughts'};
-var _user$project$NoughtsAndCrosses$noughtsCSS = _user$project$NoughtsAndCrosses$playerCSS(
-	_elm_lang$core$Maybe$Just(_user$project$NoughtsAndCrosses$Noughts));
-var _user$project$NoughtsAndCrosses$playersTurn = function (model) {
-	return _elm_lang$core$Native_Utils.eq(
-		A2(
-			_elm_lang$core$Basics_ops['%'],
-			_elm_lang$core$List$length(model.previousMoves),
-			2),
-		0) ? _user$project$NoughtsAndCrosses$Crosses : _user$project$NoughtsAndCrosses$Noughts;
-};
-var _user$project$NoughtsAndCrosses$turnsLeft = F2(
-	function (model, player) {
-		var whoseTurn = _user$project$NoughtsAndCrosses$playersTurn(model);
-		var allTurns = 9 - _elm_lang$core$List$length(model.previousMoves);
-		var pairs = (allTurns / 2) | 0;
-		var extra = _elm_lang$core$Native_Utils.eq(whoseTurn, player) ? A2(_elm_lang$core$Basics_ops['%'], allTurns, 2) : 0;
-		return pairs + extra;
-	});
-var _user$project$NoughtsAndCrosses$calculateWinner = function (board) {
-	var lineStates = _user$project$NoughtsAndCrosses$calculateLineStates(board);
-	var playerWins = function (player) {
-		return A2(
-			_elm_lang$core$List$any,
-			_elm_lang$core$List$all(
-				function (p) {
-					return _elm_lang$core$Native_Utils.eq(
-						p,
-						_elm_lang$core$Maybe$Just(player));
-				}),
-			lineStates);
-	};
-	return playerWins(_user$project$NoughtsAndCrosses$Noughts) ? _elm_lang$core$Maybe$Just(_user$project$NoughtsAndCrosses$Noughts) : (playerWins(_user$project$NoughtsAndCrosses$Crosses) ? _elm_lang$core$Maybe$Just(_user$project$NoughtsAndCrosses$Crosses) : _elm_lang$core$Maybe$Nothing);
-};
-var _user$project$NoughtsAndCrosses$isDraw = function (model) {
-	var lineStates = _user$project$NoughtsAndCrosses$calculateLineStates(model.board);
-	var crossesLeft = A2(_user$project$NoughtsAndCrosses$turnsLeft, model, _user$project$NoughtsAndCrosses$Crosses);
-	var noughtsLeft = A2(_user$project$NoughtsAndCrosses$turnsLeft, model, _user$project$NoughtsAndCrosses$Noughts);
-	var isPossibleWinningLine = function (states) {
-		var crosses = _elm_lang$core$List$length(
-			A2(
-				_elm_lang$core$List$filter,
-				function (p) {
-					return _elm_lang$core$Native_Utils.eq(
-						p,
-						_elm_lang$core$Maybe$Just(_user$project$NoughtsAndCrosses$Crosses));
-				},
-				states));
-		var noughts = _elm_lang$core$List$length(
-			A2(
-				_elm_lang$core$List$filter,
-				function (p) {
-					return _elm_lang$core$Native_Utils.eq(
-						p,
-						_elm_lang$core$Maybe$Just(_user$project$NoughtsAndCrosses$Noughts));
-				},
-				states));
-		return ((_elm_lang$core$Native_Utils.cmp(noughts + noughtsLeft, 3) > -1) && _elm_lang$core$Native_Utils.eq(crosses, 0)) || ((_elm_lang$core$Native_Utils.cmp(crosses + crossesLeft, 3) > -1) && _elm_lang$core$Native_Utils.eq(noughts, 0));
-	};
-	return !A2(_elm_lang$core$List$any, isPossibleWinningLine, lineStates);
-};
-var _user$project$NoughtsAndCrosses$HistoryForward = {ctor: 'HistoryForward'};
-var _user$project$NoughtsAndCrosses$HistoryBack = {ctor: 'HistoryBack'};
-var _user$project$NoughtsAndCrosses$PlayMove = F2(
-	function (a, b) {
-		return {ctor: 'PlayMove', _0: a, _1: b};
-	});
-var _user$project$NoughtsAndCrosses$view = function (model) {
-	var historyText = A2(
-		_elm_lang$core$Basics_ops['++'],
-		'Move: ',
-		_elm_lang$core$Basics$toString(
-			_elm_lang$core$List$length(model.previousMoves)));
-	var historyTextDiv = A2(
-		_elm_lang$html$Html$div,
+var _user$project$EditorElm$cursorDiv = function () {
+	var pseudoRelCSS = _user$project$EditorElm$styles(
 		{
 			ctor: '::',
-			_0: _user$project$NoughtsAndCrosses$historyTextCSS,
-			_1: {ctor: '[]'}
-		},
-		{
-			ctor: '::',
-			_0: _elm_lang$html$Html$text(historyText),
-			_1: {ctor: '[]'}
-		});
-	var historyButton = F3(
-		function (face, message, moves) {
-			var attributes = {
-				ctor: '::',
-				_0: _elm_lang$html$Html_Attributes$disabled(
-					_elm_lang$core$List$isEmpty(moves)),
-				_1: {
-					ctor: '::',
-					_0: _elm_lang$html$Html_Events$onClick(message),
-					_1: {ctor: '[]'}
-				}
-			};
-			return A2(
-				_elm_lang$html$Html$button,
-				attributes,
-				{
-					ctor: '::',
-					_0: _elm_lang$html$Html$text(face),
-					_1: {ctor: '[]'}
-				});
-		});
-	var controlsDiv = A2(
-		_elm_lang$html$Html$div,
-		{
-			ctor: '::',
-			_0: _user$project$NoughtsAndCrosses$controlsCSS,
-			_1: {ctor: '[]'}
-		},
-		{
-			ctor: '::',
-			_0: A3(historyButton, '<', _user$project$NoughtsAndCrosses$HistoryBack, model.previousMoves),
+			_0: _rtfeldman$elm_css$Css$position(_rtfeldman$elm_css$Css$relative),
 			_1: {
 				ctor: '::',
-				_0: historyTextDiv,
-				_1: {
-					ctor: '::',
-					_0: A3(historyButton, '>', _user$project$NoughtsAndCrosses$HistoryForward, model.futureMoves),
-					_1: {ctor: '[]'}
-				}
+				_0: _rtfeldman$elm_css$Css$width(_rtfeldman$elm_css$Css$zero),
+				_1: {ctor: '[]'}
 			}
 		});
-	var whoseTurn = _user$project$NoughtsAndCrosses$playersTurn(model);
-	var playMessage = _user$project$NoughtsAndCrosses$PlayMove(whoseTurn);
-	var winner = _user$project$NoughtsAndCrosses$calculateWinner(model.board);
-	var viewSquare = function (bc) {
-		var playSquare = (_elm_lang$core$Native_Utils.eq(winner, _elm_lang$core$Maybe$Nothing) && (!_user$project$NoughtsAndCrosses$isDraw(model))) ? {
+	var cursorCSS = _user$project$EditorElm$styles(
+		{
 			ctor: '::',
-			_0: _elm_lang$html$Html_Events$onClick(
-				A2(_user$project$NoughtsAndCrosses$PlayMove, whoseTurn, bc)),
-			_1: {ctor: '[]'}
-		} : {ctor: '[]'};
-		var _p10 = function () {
-			var _p11 = A2(_elm_lang$core$Dict$get, bc, model.board);
-			if (_p11.ctor === 'Nothing') {
-				return {ctor: '_Tuple2', _0: '', _1: playSquare};
-			} else {
-				if (_p11._0.ctor === 'Noughts') {
-					return {
-						ctor: '_Tuple2',
-						_0: 'O',
-						_1: {
-							ctor: '::',
-							_0: _user$project$NoughtsAndCrosses$noughtsCSS,
-							_1: {ctor: '[]'}
-						}
-					};
-				} else {
-					return {
-						ctor: '_Tuple2',
-						_0: 'X',
-						_1: {
-							ctor: '::',
-							_0: _user$project$NoughtsAndCrosses$crossesCSS,
-							_1: {ctor: '[]'}
-						}
-					};
-				}
-			}
-		}();
-		var face = _p10._0;
-		var attributes = _p10._1;
-		var allAttributes = {ctor: '::', _0: _user$project$NoughtsAndCrosses$squareCSS, _1: attributes};
-		return A2(
-			_elm_lang$html$Html$td,
-			allAttributes,
-			{
+			_0: _rtfeldman$elm_css$Css$backgroundColor(_rtfeldman$elm_css$Css_Colors$orange),
+			_1: {
 				ctor: '::',
-				_0: _elm_lang$html$Html$text(face),
-				_1: {ctor: '[]'}
-			});
-	};
-	var viewRow = function (y) {
-		return A2(
-			_elm_lang$html$Html$tr,
-			{ctor: '[]'},
-			{
-				ctor: '::',
-				_0: viewSquare(
-					{ctor: '_Tuple2', _0: 0, _1: y}),
+				_0: _rtfeldman$elm_css$Css$width(
+					_rtfeldman$elm_css$Css$px(1.5)),
 				_1: {
 					ctor: '::',
-					_0: viewSquare(
-						{ctor: '_Tuple2', _0: 1, _1: y}),
+					_0: _rtfeldman$elm_css$Css$height(
+						_rtfeldman$elm_css$Css$em(1)),
 					_1: {
 						ctor: '::',
-						_0: viewSquare(
-							{ctor: '_Tuple2', _0: 2, _1: y}),
+						_0: _rtfeldman$elm_css$Css$position(_rtfeldman$elm_css$Css$absolute),
 						_1: {ctor: '[]'}
 					}
 				}
-			});
-	};
-	var boardDiv = A2(
-		_elm_lang$html$Html$table,
+			}
+		});
+	var actualCursor = A2(
+		_elm_lang$html$Html$div,
 		{
 			ctor: '::',
-			_0: _user$project$NoughtsAndCrosses$boardCSS,
+			_0: cursorCSS,
+			_1: {ctor: '[]'}
+		},
+		{ctor: '[]'});
+	var pseudoRel = A2(
+		_elm_lang$html$Html$div,
+		{
+			ctor: '::',
+			_0: pseudoRelCSS,
 			_1: {ctor: '[]'}
 		},
 		{
 			ctor: '::',
-			_0: viewRow(0),
-			_1: {
+			_0: actualCursor,
+			_1: {ctor: '[]'}
+		});
+	return pseudoRel;
+}();
+var _user$project$EditorElm$checkbox = F4(
+	function (labelString, message, checked, extraCSS) {
+		return A2(
+			_elm_lang$html$Html$label,
+			{ctor: '[]'},
+			{
 				ctor: '::',
-				_0: viewRow(1),
+				_0: A2(
+					_elm_lang$html$Html$input,
+					{
+						ctor: '::',
+						_0: _elm_lang$html$Html_Attributes$type_('checkbox'),
+						_1: {
+							ctor: '::',
+							_0: _elm_lang$html$Html_Attributes$checked(checked),
+							_1: {
+								ctor: '::',
+								_0: _elm_lang$html$Html_Events$onClick(message),
+								_1: {
+									ctor: '::',
+									_0: _user$project$EditorElm$styles(extraCSS),
+									_1: {ctor: '[]'}
+								}
+							}
+						}
+					},
+					{ctor: '[]'}),
 				_1: {
 					ctor: '::',
-					_0: viewRow(2),
+					_0: _elm_lang$html$Html$text(labelString),
 					_1: {ctor: '[]'}
 				}
+			});
+	});
+var _user$project$EditorElm$Model = F6(
+	function (a, b, c, d, e, f) {
+		return {upLines: a, downLines: b, currentLeft: c, currentRight: d, showLineNumbers: e, showColumnNumber: f};
+	});
+var _user$project$EditorElm$ToggleColumnNumber = {ctor: 'ToggleColumnNumber'};
+var _user$project$EditorElm$ToggleLineNumbers = {ctor: 'ToggleLineNumbers'};
+var _user$project$EditorElm$HandleKeyboardEvent = function (a) {
+	return {ctor: 'HandleKeyboardEvent', _0: a};
+};
+var _user$project$EditorElm$keyGrabberAttribute = function () {
+	var keyGrabberDecoder = A2(_elm_lang$core$Json_Decode$map, _user$project$EditorElm$HandleKeyboardEvent, _Gizra$elm_keyboard_event$Keyboard_Event$decodeKeyboardEvent);
+	var keyGrabberOptions = {stopPropagation: true, preventDefault: true};
+	return A3(_elm_lang$html$Html_Events$onWithOptions, 'keydown', keyGrabberOptions, keyGrabberDecoder);
+}();
+var _user$project$EditorElm$view = function (model) {
+	var statusBar = function () {
+		var columnNumberElement = _elm_lang$html$Html$text(
+			_elm_lang$core$Basics$toString(
+				_elm_lang$core$String$length(model.currentLeft)));
+		var infoDivs = _user$project$EditorElm$filterPairs(
+			{
+				ctor: '::',
+				_0: {ctor: '_Tuple2', _0: columnNumberElement, _1: model.showColumnNumber},
+				_1: {ctor: '[]'}
+			});
+		return A2(
+			_elm_lang$html$Html$div,
+			{ctor: '[]'},
+			infoDivs);
+	}();
+	var optionControls = A2(
+		_elm_lang$html$Html$fieldset,
+		{ctor: '[]'},
+		{
+			ctor: '::',
+			_0: A4(
+				_user$project$EditorElm$checkbox,
+				'Show Line Numbers',
+				_user$project$EditorElm$ToggleLineNumbers,
+				model.showLineNumbers,
+				{ctor: '[]'}),
+			_1: {
+				ctor: '::',
+				_0: A4(
+					_user$project$EditorElm$checkbox,
+					'Show Column Numbers',
+					_user$project$EditorElm$ToggleColumnNumber,
+					model.showColumnNumber,
+					{ctor: '[]'}),
+				_1: {ctor: '[]'}
 			}
 		});
-	var _p12 = function () {
-		var _p13 = winner;
-		if (_p13.ctor === 'Just') {
-			var _p14 = _p13._0;
-			return {
-				ctor: '_Tuple2',
-				_0: A2(
-					_elm_lang$core$Basics_ops['++'],
-					_elm_lang$core$Basics$toString(_p14),
-					' wins'),
-				_1: _elm_lang$core$Maybe$Just(_p14)
+	var makeLineNumber = function (lineNumber) {
+		return A2(
+			_elm_lang$html$Html$td,
+			{
+				ctor: '::',
+				_0: _user$project$EditorElm$lineNumberCSS,
+				_1: {ctor: '[]'}
+			},
+			{
+				ctor: '::',
+				_0: _elm_lang$html$Html$text(
+					_elm_lang$core$Basics$toString(lineNumber)),
+				_1: {ctor: '[]'}
+			});
+	};
+	var makeRow = F2(
+		function (lineNumber, line) {
+			var cells = model.showLineNumbers ? {
+				ctor: '::',
+				_0: makeLineNumber(lineNumber),
+				_1: {
+					ctor: '::',
+					_0: line,
+					_1: {ctor: '[]'}
+				}
+			} : {
+				ctor: '::',
+				_0: line,
+				_1: {ctor: '[]'}
 			};
-		} else {
-			return _user$project$NoughtsAndCrosses$isDraw(model) ? {ctor: '_Tuple2', _0: 'Draw', _1: _elm_lang$core$Maybe$Nothing} : {
-				ctor: '_Tuple2',
-				_0: A2(
-					_elm_lang$core$Basics_ops['++'],
-					_elm_lang$core$Basics$toString(whoseTurn),
-					'\'s turn'),
-				_1: _elm_lang$core$Maybe$Just(whoseTurn)
-			};
-		}
-	}();
-	var statusText = _p12._0;
-	var statusPlayer = _p12._1;
-	var statusDiv = A2(
+			return A2(
+				_elm_lang$html$Html$tr,
+				{ctor: '[]'},
+				cells);
+		});
+	var currentLine = A2(
 		_elm_lang$html$Html$div,
 		{
 			ctor: '::',
-			_0: _user$project$NoughtsAndCrosses$statusCSS,
+			_0: _user$project$EditorElm$lineCSS,
 			_1: {
 				ctor: '::',
-				_0: _user$project$NoughtsAndCrosses$playerCSS(statusPlayer),
+				_0: _user$project$EditorElm$currentLineCSS,
 				_1: {ctor: '[]'}
 			}
 		},
 		{
 			ctor: '::',
-			_0: _elm_lang$html$Html$text(statusText),
-			_1: {ctor: '[]'}
-		});
-	var gameDiv = A2(
-		_elm_lang$html$Html$div,
-		{
-			ctor: '::',
-			_0: _user$project$NoughtsAndCrosses$gameCSS,
-			_1: {ctor: '[]'}
-		},
-		{
-			ctor: '::',
-			_0: statusDiv,
+			_0: A2(
+				_elm_lang$html$Html$div,
+				{ctor: '[]'},
+				{
+					ctor: '::',
+					_0: _elm_lang$html$Html$text(model.currentLeft),
+					_1: {ctor: '[]'}
+				}),
 			_1: {
 				ctor: '::',
-				_0: boardDiv,
+				_0: _user$project$EditorElm$cursorDiv,
 				_1: {
 					ctor: '::',
-					_0: controlsDiv,
+					_0: A2(
+						_elm_lang$html$Html$div,
+						{ctor: '[]'},
+						{
+							ctor: '::',
+							_0: _elm_lang$html$Html$text(model.currentRight),
+							_1: {ctor: '[]'}
+						}),
 					_1: {ctor: '[]'}
 				}
 			}
 		});
+	var lineNode = function (s) {
+		return A2(
+			_elm_lang$html$Html$div,
+			{
+				ctor: '::',
+				_0: _user$project$EditorElm$lineCSS,
+				_1: {ctor: '[]'}
+			},
+			{
+				ctor: '::',
+				_0: _elm_lang$html$Html$text(s),
+				_1: {ctor: '[]'}
+			});
+	};
+	var upDivs = _elm_lang$core$List$reverse(
+		A2(_elm_lang$core$List$map, lineNode, model.upLines));
+	var downDivs = A2(_elm_lang$core$List$map, lineNode, model.downLines);
+	var lineDivs = A2(
+		_elm_lang$core$Basics_ops['++'],
+		upDivs,
+		A2(
+			_elm_lang$core$Basics_ops['++'],
+			{
+				ctor: '::',
+				_0: currentLine,
+				_1: {ctor: '[]'}
+			},
+			downDivs));
+	var contentDivs = A2(_elm_lang$core$List$indexedMap, makeRow, lineDivs);
+	var editor = A2(
+		_elm_lang$html$Html$table,
+		{
+			ctor: '::',
+			_0: _user$project$EditorElm$editorStyle,
+			_1: {
+				ctor: '::',
+				_0: _user$project$EditorElm$keyGrabberAttribute,
+				_1: {
+					ctor: '::',
+					_0: _elm_lang$html$Html_Attributes$tabindex(0),
+					_1: {ctor: '[]'}
+				}
+			}
+		},
+		contentDivs);
 	return A2(
 		_elm_lang$html$Html$div,
 		{ctor: '[]'},
 		{
 			ctor: '::',
-			_0: _user$project$NoughtsAndCrosses$tableStyleElement,
+			_0: optionControls,
 			_1: {
 				ctor: '::',
-				_0: gameDiv,
-				_1: {ctor: '[]'}
+				_0: editor,
+				_1: {
+					ctor: '::',
+					_0: statusBar,
+					_1: {ctor: '[]'}
+				}
 			}
 		});
 };
-var _user$project$NoughtsAndCrosses$main = _elm_lang$html$Html$beginnerProgram(
-	{model: _user$project$NoughtsAndCrosses$initialModel, view: _user$project$NoughtsAndCrosses$view, update: _user$project$NoughtsAndCrosses$update})();
+var _user$project$EditorElm$main = _elm_lang$html$Html$program(
+	{init: _user$project$EditorElm$init, update: _user$project$EditorElm$update, subscriptions: _user$project$EditorElm$subscriptions, view: _user$project$EditorElm$view})();
 
 var Elm = {};
-Elm['NoughtsAndCrosses'] = Elm['NoughtsAndCrosses'] || {};
-if (typeof _user$project$NoughtsAndCrosses$main !== 'undefined') {
-    _user$project$NoughtsAndCrosses$main(Elm['NoughtsAndCrosses'], 'NoughtsAndCrosses', undefined);
+Elm['EditorElm'] = Elm['EditorElm'] || {};
+if (typeof _user$project$EditorElm$main !== 'undefined') {
+    _user$project$EditorElm$main(Elm['EditorElm'], 'EditorElm', undefined);
 }
 
 if (typeof define === "function" && define['amd'])
