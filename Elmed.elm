@@ -53,8 +53,9 @@ type alias Name = String
 
 type AST
     = Var Name
-    | App Expr Expr
+    | App (List Expr)
     | Let (List Def) Expr
+    | PlaceHolder
 
 type alias Expr = AST
 
@@ -65,8 +66,9 @@ type alias Def =
 
 type Path
     = Top
-    | AppLeft Path AST
-    | AppRight AST Path
+    | AppPath Path (List Expr) (List Expr)
+    -- | LetDefPath Path (List Def) (List Def) Expr
+
 
 type Hole
     = ExprHole Expr
@@ -85,7 +87,7 @@ subscriptions model =
 exampleModel : Model
 exampleModel =
     { hole = ExprHole (Var "x")
-    , path = AppRight (Var "y") (AppLeft Top (Var "z"))
+    , path = AppPath Top [] [Var "y", Var "z"]
     }
 
 init : ( Model, Cmd Message )
@@ -103,58 +105,102 @@ update msg model =
 interpretCtrlKey : String -> Model -> Model
 interpretCtrlKey s model = model
 
-
 moveLeft : Model -> Model
 moveLeft model =
     case (model.path, model.hole) of
         (Top, _) -> model
-        (AppLeft _ _, _) -> model
-        (AppRight left p, ExprHole hole) ->
-            { model
-                | hole = ExprHole left
-                , path = AppLeft p hole
-                }
-        (AppRight _ _, DefHole _) -> model
+        (AppPath _ _ _, DefHole _) -> model
+        (AppPath p left right, ExprHole hole) ->
+            case left of
+                [] -> model
+                x :: rest ->
+                    { model
+                        | hole = ExprHole x
+                        , path = AppPath p rest (hole :: right)
+                    }
 
 moveRight : Model -> Model
 moveRight model =
     case (model.path, model.hole) of
         (Top, _) -> model
-        (AppRight _ _, _) -> model
-        (AppLeft p right, ExprHole hole) ->
-            { model
-                | hole = ExprHole right
-                , path = AppRight hole p
-                }
-        (AppLeft _ _, DefHole _) -> model
+        (AppPath _ _ _, DefHole _) -> model
+        (AppPath p left right, ExprHole hole) ->
+            case right of
+                [] -> model
+                x :: rest ->
+                    { model
+                        | hole = ExprHole x
+                        , path = AppPath p (hole :: left) rest
+                    }
 
 moveUp : Model -> Model
 moveUp model =
     case (model.path, model.hole) of
         (Top, _) -> model
-        (AppRight left p, ExprHole hole) ->
+        (AppPath _ _ _, DefHole _) -> model
+        (AppPath p left right, ExprHole hole) ->
             { model
-                | hole = ExprHole <| App left hole
+                | hole = ExprHole <| App (left ++ [hole] ++ right)
                 , path = p
             }
-        (AppLeft p right, ExprHole hole) ->
-            { model
-                | hole = ExprHole <| App hole right
-                , path = p
-                }
-        (_, DefHole _) -> model
+
 
 moveDown : Model -> Model
 moveDown model =
     case model.hole of
         DefHole _ -> model
         ExprHole (Var _) -> model
+        ExprHole PlaceHolder -> model
         ExprHole (Let _ _) -> model
-        ExprHole (App left right) ->
+        ExprHole (App args) ->
+            case args of
+                [] ->
+                    -- Technically not a valid application of only a single expression
+                    { model
+                        | hole = ExprHole PlaceHolder
+                        , path = AppPath model.path [] []
+                    }
+                x :: rest ->
+                    { model
+                        | hole = ExprHole x
+                        , path = AppPath model.path [] rest
+                    }
+
+transformCurrentExpr : (Expr -> Expr) -> Model -> Model
+transformCurrentExpr newExpr model =
+    case model.hole of
+        DefHole _ -> model
+        ExprHole e ->
             { model
-                | hole = ExprHole left
-                , path = AppLeft model.path right
-                }
+                | hole = ExprHole <| newExpr e
+            }
+
+addToCurrent : Model -> Model
+addToCurrent model =
+    case model.hole of
+        DefHole _ -> model
+        ExprHole expr -> 
+            case expr of
+                Var _ ->
+                    { model
+                        | hole = ExprHole <| App [expr, PlaceHolder]
+                    }
+                PlaceHolder ->
+                    { model
+                        | hole = ExprHole <| App [expr, PlaceHolder]
+                    }
+                App args ->
+                    { model
+                        | hole = ExprHole <| App (args ++ [PlaceHolder])
+                    }
+                Let defs expr ->
+                    let
+                        newDef = { pattern = "x", expr = PlaceHolder }
+                        newDefs = defs ++ [newDef]
+                    in
+                        { model
+                            | hole = ExprHole <| Let newDefs expr
+                        }
 
 interpretKey : String -> Model -> Model
 interpretKey s model =
@@ -163,6 +209,9 @@ interpretKey s model =
         "ArrowRight" -> moveRight model
         "ArrowUp" -> moveUp model
         "ArrowDown" -> moveDown model
+        "l" -> transformCurrentExpr (Let []) model
+        "v" -> transformCurrentExpr (\_ -> Var "x") model
+        "a" -> addToCurrent model
         _ -> model
 
 bareUpdate : Message -> Model -> Model
@@ -207,6 +256,13 @@ exprCSS =
         [ -- Css.border3 (Css.px 1) Css.solid (Colors.orange)
         ]
 
+placeHolderCSS : Html.Attribute Message
+placeHolderCSS =
+    styles
+        [ Css.width (Css.em 2)
+        , Css.borderBottom3 (Css.px 1) Css.solid (Colors.orange)
+        ]
+
 appCSS : Html.Attribute Message
 appCSS = flexbox Css.row []
 
@@ -216,17 +272,19 @@ focusedCSS =
         [ Css.border3 (Css.px 1) Css.solid (Css.hex "664cdb")
         ]
 
-viewApplication : Html Message -> Html Message -> Html Message
-viewApplication left right =
-    div [exprCSS, appCSS] [ left, right ]    
+viewApplication : List (Html Message) -> Html Message
+viewApplication args =
+    div [exprCSS, appCSS] args
 
 viewExpression : Expr -> Html Message
 viewExpression expr =
     case expr of
+        PlaceHolder ->
+            div [exprCSS, placeHolderCSS] []
         Var s ->
             div [exprCSS] [text s]
-        App left right ->
-            viewApplication (viewExpression left) (viewExpression right)
+        App args ->
+            viewApplication <| List.map viewExpression args
         Let defs expr ->
             let
                 defsDiv = div [] <| List.map viewDefinition defs
@@ -252,16 +310,12 @@ viewPath : Html Message -> Path -> Html Message
 viewPath hole path =
     case path of
         Top -> hole
-        AppLeft parent child ->
+        AppPath parent left right ->
             let
-                childHtml = viewExpression child
-                newHole = viewApplication hole childHtml
-            in
-                viewPath newHole parent
-        AppRight child parent ->
-            let
-                childHtml = viewExpression child
-                newHole = viewApplication childHtml hole
+                leftArgs = List.map viewExpression <| List.reverse left
+                rightArgs = List.map viewExpression right
+                argsHtml = leftArgs ++ [hole] ++ rightArgs
+                newHole = viewApplication argsHtml
             in
                 viewPath newHole parent
 
