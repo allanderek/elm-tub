@@ -1,0 +1,20 @@
+<!DOCTYPE HTML>
+<html>
+  <head><meta charset="UTF-8">
+  <title>Elm Tub</title>
+  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/picnicss/6.3.2/picnic.min.css"> -->
+  <script type="text/javascript" src="js/NoughtsAndCrosses.js"></script>
+</head>
+<body>
+  <div id="noughts-and-crosses-embed"></div>
+
+<script type="text/javascript">
+  /* global Elm */
+  function embed_by_id(embedder, id_name, ...flags){
+    var embed_element = document.getElementById(id_name);
+    embedder.embed(embed_element, ...flags);
+  }
+  embed_by_id(Elm.NoughtsAndCrosses, 'noughts-and-crosses-embed');
+</script>
+</body>
+</html>
