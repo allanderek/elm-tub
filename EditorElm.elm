@@ -61,12 +61,14 @@ type alias Character =
     }
 
 type alias Line = List Character
+-- A line fragment is unsurprisingly the same as a line.
+type alias Fragment = List Character
 
 type alias Model =
     { upLines : List Line
     , downLines : List Line
-    , currentLeft : List Character
-    , currentRight : List Character
+    , currentLeft : Fragment
+    , currentRight : Fragment
     , showLineNumbers : Bool
     , showColumnNumber : Bool
     }
@@ -116,7 +118,6 @@ addKeywordCategory char =
         False ->
             { char | categories = Keyword :: char.categories }
 
-type alias Fragment = List Character
 type HighlightState
     = Begin
     | Content
@@ -226,14 +227,14 @@ update : Message -> Model -> ( Model, Cmd Message )
 update msg model =
     ( bareUpdate msg model, Cmd.none )
 
-{-
 insertNewLine : Model -> Model
 insertNewLine model =
     { model
         | upLines = model.currentLeft :: model.upLines
-        , currentLeft = ""
+        , currentLeft = []
     }
 
+{-
 moveUp : Model -> Model
 moveUp model =
     case model.upLines of
@@ -534,7 +535,7 @@ cursorDiv : Html Message
 cursorDiv =
     let
         {- The cursor div itself is placed within a pseudo relative
-        element that has zero hieght and width, this just allows us
+        element that has zero height and width, this just allows us
         to place the cursor relative to that. That means the cursor
         won't take up space in the flow.
         -}
@@ -611,10 +612,10 @@ view model =
 
         currentLine =
             div
-                [ currentLineCSS ]
-                [ lineNode model.currentLeft
+                [ lineCSS, currentLineCSS ]
+                [ div [] <| List.map charNode model.currentLeft
                 , cursorDiv
-                , lineNode model.currentRight
+                , div [] <| List.map charNode model.currentRight
                 ]
 
         upDivs = List.reverse <| List.map lineNode model.upLines
