@@ -51,13 +51,16 @@ type Message
 
 type Category
     = Keyword
-    | Selection
+    | Normal
 
 
 type alias Character =
     { content : String
-    -- Should really be a set, but that's awkward, we need elm-all-dict.
-    , categories : List Category
+      -- Ultimately I think we'll have a dictionary of 'highlighters' which
+      -- mapped to the 'category' that the character is in. For example we might
+      -- have a highligher for elm, plus a highligher for elm-compiler output
+      -- which has categories such as 'Normal', 'Warning', and 'Error'.
+    , category : Category
     }
 
 type alias Line = List Character
@@ -111,21 +114,19 @@ isKeyword s =
         "import" -> True
         _ -> False
 
-addKeywordCategory : Character -> Character
-addKeywordCategory char =
-    case List.member Keyword char.categories of
-        True -> char
-        False ->
-            { char | categories = Keyword :: char.categories }
-
 type HighlightState
     = Begin
     | Content
     | Whitespace
+
 type alias HighlightCurrent =
     { state : HighlightState
     , parsed : Fragment
     }
+
+giveCategory : Category -> Character -> Character
+giveCategory category character =
+    { character | category = category }
 
 isCurrentTokenKind : HighlightState -> Character -> Bool
 isCurrentTokenKind kind char =
@@ -150,8 +151,8 @@ elmHighlightFragment current remaining =
                 parsedString = charactersToString current.parsed
                 newParsed =
                     if isKeyword parsedString
-                    then List.map addKeywordCategory current.parsed
-                    else current.parsed
+                    then List.map (giveCategory Keyword) current.parsed
+                    else List.map (giveCategory Normal) current.parsed
                 newCurrent =
                     { current | parsed = newParsed }
             in
@@ -192,11 +193,31 @@ elmHighlightLine line =
         [] -> newState.parsed
         _ -> newState.parsed ++ (elmHighlightLine remaining)
 
+-- For now I'm just re-highlighting the entire model, but ultimately we should
+-- only bother re-highlighting lines which have actually changed.
+elmHighlightModel : Model -> Model
+elmHighlightModel model =
+    -- Currently works because we are independently highlighting each line,
+    -- but the uplines are in reverse order, so when we do multi-line comments
+    -- etc. we will need to worry about that, but not for now.
+    let
+        position = List.length model.currentLeft
+        currentLine = model.currentLeft ++ model.currentRight
+        newCurrentLine = elmHighlightLine currentLine
+        newLeft = List.take position newCurrentLine
+        newRight = List.drop position newCurrentLine
+    in
+    { model
+        | upLines = List.map elmHighlightLine model.upLines
+        , downLines = List.map elmHighlightLine model.downLines
+        , currentLeft = newLeft
+        , currentRight = newRight
+    }
 
 makeCharacter : String -> Character
 makeCharacter s =
     { content = s
-    , categories = []
+    , category = Normal
     }
 
 init : ( Model, Cmd Message )
@@ -206,9 +227,7 @@ init =
         makeLine s =
             List.map makeCharacter <| List.map String.fromChar <| String.toList s
         
-        bareLines = List.map makeLine <| String.lines beginnerContent
-        programLines = List.map elmHighlightLine bareLines
-
+        programLines = List.map makeLine <| String.lines beginnerContent
         currentRight = Maybe.withDefault [] <| List.head programLines
 
         firstModel = 
@@ -220,7 +239,7 @@ init =
             , showColumnNumber = True
             }
     in
-        (firstModel, Cmd.none)
+        (elmHighlightModel firstModel, Cmd.none)
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -312,7 +331,7 @@ goToLineEnd model =
 spaceChar : Character
 spaceChar =
     { content = " "
-    , categories = []
+    , category = Normal
     }
 
 joinNextLine : Model -> Model
@@ -495,15 +514,23 @@ bareUpdate msg model =
         HandleKeyboardEvent event ->
             case event.key of
                 Just s ->
-                    if event.ctrlKey
-                    then interpretCtrlKey s model
-                    else if event.altKey
-                    then interpretAltKey s model
-                    else if event.shiftKey
-                    then interpretShiftKey s model
-                    else if event.metaKey
-                    then interpretMetaKey s model
-                    else interpretKey s model
+                    let
+                        newModel =
+                            if event.ctrlKey
+                            then interpretCtrlKey s model
+                            else if event.altKey
+                            then interpretAltKey s model
+                            else if event.shiftKey
+                            then interpretShiftKey s model
+                            else if event.metaKey
+                            then interpretMetaKey s model
+                            else interpretKey s model
+                    in
+                        -- This means we will always highlight the model, so it
+                        -- means we should take care in `elmHighlightModel` not
+                        -- to unnecessarily highlight lines which have not
+                        -- changed. 
+                        elmHighlightModel newModel
                 Nothing -> model
 
 
@@ -555,8 +582,8 @@ selectionCSS =
 categoryStyle : Category -> Html.Attribute Message
 categoryStyle category =
     case category of
-        Selection -> selectionCSS
         Keyword -> keywordCSS
+        Normal -> styles [] -- Hmm
 
 
 lineNumberCSS : Html.Attribute Message
@@ -638,10 +665,7 @@ view model =
     let
         charNode : Character -> Html Message
         charNode char =
-            let
-                styleAttrs = List.map categoryStyle char.categories
-            in
-            Html.span styleAttrs [text char.content]
+            Html.span [ categoryStyle char.category ] [text char.content]
         lineNode line =
             div [lineCSS] <| List.map charNode line
 
