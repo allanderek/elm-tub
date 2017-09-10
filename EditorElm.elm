@@ -234,20 +234,19 @@ insertNewLine model =
         , currentLeft = []
     }
 
-{-
 moveUp : Model -> Model
 moveUp model =
     case model.upLines of
         [] -> model
         up :: further ->
             let
-                position = String.length model.currentLeft
+                position = List.length model.currentLeft
             in
                 { model 
                     | upLines = further
                     , downLines = (model.currentLeft ++ model.currentRight) :: model.downLines
-                    , currentLeft = String.left position up
-                    , currentRight = String.dropLeft position up
+                    , currentLeft = List.take position up
+                    , currentRight = List.drop position up
                 }
 
 moveDown : Model -> Model
@@ -256,41 +255,64 @@ moveDown model =
         [] -> model
         down :: further ->
         let
-            position = String.length model.currentLeft
+            position = List.length model.currentLeft
         in
            { model 
                     | downLines = further
                     , upLines = (model.currentLeft ++ model.currentRight) :: model.upLines
-                    , currentLeft = String.left position down
-                    , currentRight = String.dropLeft position down
+                    , currentLeft = List.take position down
+                    , currentRight = List.drop position down
                 }
+
+splitRight : Int -> List a -> (List a, List a)
+splitRight i s =
+    let
+        leftLength = (List.length s) - i
+    in
+    (List.take leftLength s, List.drop leftLength s)
+
+dropRight : Int -> List a -> List a
+dropRight i s =
+    let
+        leftLength = (List.length s) - i
+    in
+    List.take leftLength s
 
 moveLeft : Model -> Model
 moveLeft model =
+    let
+        (newLeft, addedRight) = splitRight 1 model.currentLeft
+    in
     { model
-        | currentLeft = String.dropRight 1 model.currentLeft
-        , currentRight = (String.right 1 model.currentLeft) ++ model.currentRight
+        | currentLeft = newLeft
+        , currentRight = addedRight ++ model.currentRight
     }
     
 moveRight : Model -> Model
 moveRight model =
     { model
-        | currentRight = String.dropLeft 1 model.currentRight
-        , currentLeft = model.currentLeft ++ (String.left 1 model.currentRight)
+        | currentRight = List.drop 1 model.currentRight
+        , currentLeft = model.currentLeft ++ (List.take 1 model.currentRight)
     }
 
 goToLineStart : Model -> Model
 goToLineStart model =
     { model
-        | currentLeft = ""
+        | currentLeft = []
         , currentRight = model.currentLeft ++ model.currentRight
     }
 
 goToLineEnd : Model -> Model
 goToLineEnd model =
     { model
-        | currentRight = ""
+        | currentRight = []
         , currentLeft = model.currentLeft ++ model.currentRight
+    }
+
+spaceChar : Character
+spaceChar =
+    { content = " "
+    , categories = []
     }
 
 joinNextLine : Model -> Model
@@ -299,25 +321,25 @@ joinNextLine model =
         [] -> model
         next :: rest ->
             { model
-                | currentRight = model.currentRight ++ " " ++ next
+                | currentRight = model.currentRight ++ [ spaceChar ] ++ next
                 , downLines = rest
             }
 
 deleteCurrentLine : Model -> Model
 deleteCurrentLine model =
     let
-        position = String.length model.currentLeft
+        position = List.length model.currentLeft
     in
         case (model.downLines, model.upLines) of
             ([], []) -> 
                 { model
-                    | currentLeft = ""
-                    , currentRight = ""
+                    | currentLeft = []
+                    , currentRight = []
                 }
             (next :: rest, _) ->
                 let
-                    left = String.left position next
-                    right = String.dropLeft position next
+                    left = List.take position next
+                    right = List.drop position next
                 in
                     { model
                         | currentLeft = left
@@ -326,8 +348,8 @@ deleteCurrentLine model =
                     }
             ([], prev :: rest) ->
                 let
-                    left = String.left position prev
-                    right = String.dropLeft position prev
+                    left = List.take position prev
+                    right = List.drop position prev
                 in
                     { model
                         | currentLeft = left
@@ -338,7 +360,7 @@ deleteCurrentLine model =
 backspaceChar : Model -> Model
 backspaceChar model =
     case model.currentLeft of
-        "" ->
+        [] ->
             case model.upLines of
                 [] -> model
                 prev :: rest ->
@@ -348,13 +370,13 @@ backspaceChar model =
                     }
         _ ->
             { model
-                | currentLeft = String.dropRight 1 model.currentLeft
+                | currentLeft = dropRight 1 model.currentLeft
             }
 
 deleteChar : Model -> Model
 deleteChar model =
     case model.currentRight of
-        "" ->
+        [] ->
             case model.downLines of
                 [] -> model
                 next :: rest ->
@@ -364,36 +386,51 @@ deleteChar model =
                     }
         _ ->
             { model
-                | currentRight = String.dropLeft 1 model.currentRight
+                | currentRight = List.drop 1 model.currentRight
             }
-
-
 
 
 deleteToEndOfLine : Model -> Model
 deleteToEndOfLine model =
     { model
-        | currentRight = ""
+        | currentRight = []
     }
 
 deleteToStartOfLine : Model -> Model
 deleteToStartOfLine model =
     { model
-        | currentLeft = ""
+        | currentLeft = []
     }
 
 indentLine : Model -> Model
 indentLine model =
     { model
-        | currentLeft = "    " ++ model.currentLeft
+        | currentLeft = (List.repeat 4 spaceChar) ++ model.currentLeft
     }
-    
+
+
+isSpaceChar : Character -> Bool
+isSpaceChar char =
+    char.content == " "
+
+-- TODO: This should be more robost, in particular contents of any one of the
+-- chars could be something like "   ", currently that's not possible but it
+-- could be later. 
 unindentLine : Model -> Model
 unindentLine model =
-    if String.startsWith "    " model.currentLeft
-    then { model | currentLeft = String.dropLeft 4 model.currentLeft }
-    else model
--}
+    case model.currentLeft of
+        [] -> model
+        l1 :: rest ->
+            case l1.content of
+                "\t" -> { model | currentLeft = rest }
+                _ ->
+                    let
+                        (indentation, restOfLine) =
+                            List.partition isSpaceChar model.currentLeft
+                        newIndentation = List.drop 4 indentation
+                    in
+                        { model | currentLeft = newIndentation ++ restOfLine }
+
 
 insertAtCursor : String -> Model -> Model
 insertAtCursor s model =
@@ -405,21 +442,21 @@ insertAtCursor s model =
 interpretCtrlKey : String -> Model -> Model
 interpretCtrlKey s model =
     case s of
-        "d" -> model -- deleteCurrentLine model
-        "j" -> model -- joinNextLine model
+        "d" -> deleteCurrentLine model
+        "j" -> joinNextLine model
         _ -> model
 
 interpretAltKey : String -> Model -> Model
 interpretAltKey s model =
     case s of
-        "Delete" -> model -- deleteToEndOfLine model
-        "Backspace" -> model -- deleteToStartOfLine model
+        "Delete" -> deleteToEndOfLine model
+        "Backspace" -> deleteToStartOfLine model
         _ -> model
 
 interpretShiftKey : String -> Model -> Model
 interpretShiftKey s model =
     case s of
-        "Tab" -> model -- unindentLine model
+        "Tab" -> unindentLine model
         "Shift" -> model
         _ -> insertAtCursor s model
 
@@ -431,7 +468,6 @@ interpretMetaKey s model =
 interpretKey : String -> Model -> Model
 interpretKey s model =
     case s of
-        {-
         "Enter" -> insertNewLine model
         "ArrowUp" -> moveUp model
         "ArrowDown" -> moveDown model
@@ -443,7 +479,6 @@ interpretKey s model =
         "End" -> goToLineEnd model
         "Tab" -> indentLine model
         "Meta" -> model -- For some reason it does not register below
-        -}
         _ -> insertAtCursor s model
 
 bareUpdate : Message -> Model -> Model
