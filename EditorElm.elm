@@ -48,11 +48,25 @@ type Message
     }
 -}
 
+
+type Category
+    = Keyword
+    | Selection
+
+
+type alias Character =
+    { content : String
+    -- Should really be a set, but that's awkward, we need elm-all-dict.
+    , categories : List Category
+    }
+
+type alias Line = List Character
+
 type alias Model =
-    { upLines : List String
-    , downLines : List String
-    , currentLeft : String
-    , currentRight : String
+    { upLines : List Line
+    , downLines : List Line
+    , currentLeft : List Character
+    , currentRight : List Character
     , showLineNumbers : Bool
     , showColumnNumber : Bool
     }
@@ -76,30 +90,143 @@ main =
         }
 """
 
+charactersToString : List Character -> String
+charactersToString chars =
+    String.concat <| List.map .content chars
+
+-- Note, that this does not check if the string is empty, which technically
+-- would not be whitespace, but typically means you want the same as behaviour
+-- as whitespace.
+isWhitespace : String -> Bool
+isWhitespace s =
+    String.trim s == ""
+
+isKeyword : String -> Bool
+isKeyword s =
+    case s of
+        "module" -> True
+        "exposing" -> True
+        "import" -> True
+        _ -> False
+
+addKeywordCategory : Character -> Character
+addKeywordCategory char =
+    case List.member Keyword char.categories of
+        True -> char
+        False ->
+            { char | categories = Keyword :: char.categories }
+
+type alias Fragment = List Character
+type HighlightState
+    = Begin
+    | Content
+    | Whitespace
+type alias HighlightCurrent =
+    { state : HighlightState
+    , parsed : Fragment
+    }
+
+isCurrentTokenKind : HighlightState -> Character -> Bool
+isCurrentTokenKind kind char =
+    case kind of
+        Whitespace -> isWhitespace char.content
+        Content -> not (isWhitespace char.content)
+        Begin -> False
+
+addToCurrent : HighlightCurrent -> Character -> HighlightCurrent
+addToCurrent current char =
+    { current | parsed = current.parsed ++ [char] }
+
+elmHighlightFragment 
+    : HighlightCurrent
+    -> Fragment
+    -> (HighlightCurrent, Fragment)
+elmHighlightFragment current remaining =
+    let
+        closeFragment : Fragment -> (HighlightCurrent, Fragment)
+        closeFragment remainder =
+            let
+                parsedString = charactersToString current.parsed
+                newParsed =
+                    if isKeyword parsedString
+                    then List.map addKeywordCategory current.parsed
+                    else current.parsed
+                newCurrent =
+                    { current | parsed = newParsed }
+            in
+            (newCurrent, remainder)
+
+    in
+    case (current.state, remaining) of
+        (Begin, next :: rest) ->
+            let
+                newState =
+                    case isWhitespace next.content of
+                        True -> Whitespace
+                        False -> Content
+                newCurrent =
+                    { current | parsed = [ next ], state = newState }
+            in
+            elmHighlightFragment newCurrent rest
+        (kind, next :: rest) ->
+            case isCurrentTokenKind kind next of
+                True ->
+                    elmHighlightFragment (addToCurrent current next) rest
+                False ->
+                    closeFragment remaining
+
+        (_, [])  ->
+            closeFragment []
+
+
+-- TODO: You probably need the current parser state in case it is a multi-line
+-- comment or multi-line string.
+elmHighlightLine : Line -> Line
+elmHighlightLine line =
+    let
+        beginState = { state = Begin, parsed = [] }
+        (newState, remaining) = elmHighlightFragment beginState line
+    in
+    case remaining of
+        [] -> newState.parsed
+        _ -> newState.parsed ++ (elmHighlightLine remaining)
+
+
+makeCharacter : String -> Character
+makeCharacter s =
+    { content = s
+    , categories = []
+    }
 
 init : ( Model, Cmd Message )
 init =
     let
-        programLines = String.lines beginnerContent
-        currentRight = Maybe.withDefault "" <| List.head programLines
-            
+        makeLine : String -> Line
+        makeLine s =
+            List.map makeCharacter <| List.map String.fromChar <| String.toList s
+        
+        bareLines = List.map makeLine <| String.lines beginnerContent
+        programLines = List.map elmHighlightLine bareLines
+
+        currentRight = Maybe.withDefault [] <| List.head programLines
+
+        firstModel = 
+            { upLines = []
+            , downLines = List.drop 1 programLines
+            , currentLeft = []
+            , currentRight = currentRight
+            , showLineNumbers = True
+            , showColumnNumber = True
+            }
     in
-        ( { upLines = []
-          , downLines = List.drop 1 programLines
-          , currentLeft = ""
-          , currentRight = currentRight
-          , showLineNumbers = True
-          , showColumnNumber = True
-          }
-        , Cmd.none
-        )
+        (firstModel, Cmd.none)
 
 
 update : Message -> Model -> ( Model, Cmd Message )
 update msg model =
     ( bareUpdate msg model, Cmd.none )
 
-
+{-
 insertNewLine : Model -> Model
 insertNewLine model =
     { model
@@ -241,9 +368,6 @@ deleteChar model =
 
 
 
-insertAtCursor : String -> Model -> Model
-insertAtCursor s model =
-    { model | currentLeft = model.currentLeft ++ s }
 
 deleteToEndOfLine : Model -> Model
 deleteToEndOfLine model =
@@ -268,26 +392,33 @@ unindentLine model =
     if String.startsWith "    " model.currentLeft
     then { model | currentLeft = String.dropLeft 4 model.currentLeft }
     else model
+-}
 
+insertAtCursor : String -> Model -> Model
+insertAtCursor s model =
+    let
+        newChar = makeCharacter s
+    in
+    { model | currentLeft = List.append model.currentLeft [newChar]}
 
 interpretCtrlKey : String -> Model -> Model
 interpretCtrlKey s model =
     case s of
-        "d" -> deleteCurrentLine model
-        "j" -> joinNextLine model
+        "d" -> model -- deleteCurrentLine model
+        "j" -> model -- joinNextLine model
         _ -> model
 
 interpretAltKey : String -> Model -> Model
 interpretAltKey s model =
     case s of
-        "Delete" -> deleteToEndOfLine model
-        "Backspace" -> deleteToStartOfLine model
+        "Delete" -> model -- deleteToEndOfLine model
+        "Backspace" -> model -- deleteToStartOfLine model
         _ -> model
 
 interpretShiftKey : String -> Model -> Model
 interpretShiftKey s model =
     case s of
-        "Tab" -> unindentLine model
+        "Tab" -> model -- unindentLine model
         "Shift" -> model
         _ -> insertAtCursor s model
 
@@ -299,6 +430,7 @@ interpretMetaKey s model =
 interpretKey : String -> Model -> Model
 interpretKey s model =
     case s of
+        {-
         "Enter" -> insertNewLine model
         "ArrowUp" -> moveUp model
         "ArrowDown" -> moveDown model
@@ -310,6 +442,7 @@ interpretKey s model =
         "End" -> goToLineEnd model
         "Tab" -> indentLine model
         "Meta" -> model -- For some reason it does not register below
+        -}
         _ -> insertAtCursor s model
 
 bareUpdate : Message -> Model -> Model
@@ -359,16 +492,35 @@ flexbox direction extraStyles =
 
 currentLineCSS : Html.Attribute Message
 currentLineCSS = 
-    let
-        extraStyles = [ Css.backgroundColor <| Css.hex "b7afdb" ]
-    in
-        flexbox Css.row extraStyles
+    styles [ Css.backgroundColor <| Css.hex "b7afdb" ]
 
 lineCSS : Html.Attribute Message
 lineCSS =
+    let
+        extraStyles = [ Css.minHeight (Css.em 1) ]
+    in
+        flexbox Css.row extraStyles
+
+keywordCSS : Html.Attribute Message
+keywordCSS =
     styles
-        [ Css.minHeight (Css.em 1)
+        [ Css.fontWeight Css.bold
+        , Css.color (Css.hex "4286f4")
         ]
+
+selectionCSS : Html.Attribute Message
+selectionCSS =
+    -- might be able to use Css.mixBlendMode, maybe difference.
+    styles
+        [ Css.fontWeight Css.bold
+        , Css.color (Css.hex "f44283")
+        ]
+
+categoryStyle : Category -> Html.Attribute Message
+categoryStyle category =
+    case category of
+        Selection -> selectionCSS
+        Keyword -> keywordCSS
 
 
 lineNumberCSS : Html.Attribute Message
@@ -442,18 +594,27 @@ filterPairs l =
     in
         List.filterMap filterFun l 
 
+
+
+
 view : Model -> Html Message
 view model =
     let
-        
-        lineNode s =
-            div [lineCSS] [ text s ]
+        charNode : Character -> Html Message
+        charNode char =
+            let
+                styleAttrs = List.map categoryStyle char.categories
+            in
+            Html.span styleAttrs [text char.content]
+        lineNode line =
+            div [lineCSS] <| List.map charNode line
 
         currentLine =
-            div [ lineCSS, currentLineCSS ]
-                [ div [] [ text model.currentLeft ]
+            div
+                [ currentLineCSS ]
+                [ lineNode model.currentLeft
                 , cursorDiv
-                , div [] [ text model.currentRight ]
+                , lineNode model.currentRight
                 ]
 
         upDivs = List.reverse <| List.map lineNode model.upLines
@@ -484,7 +645,7 @@ view model =
                 ]
         statusBar =
             let
-                columnNumberElement = text (toString <| String.length model.currentLeft)
+                columnNumberElement = text (toString <| List.length model.currentLeft)
                 infoDivs = filterPairs
                     [ (columnNumberElement, model.showColumnNumber)
                     ]
